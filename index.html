@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>HabitBox</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ===================== FEED VIEW ===================== -->
+  <main id="feedView" class="view">
+    <header class="topbar">
+      <h1 class="brand">Habit<span>Box</span></h1>
+    </header>
+
+    <section id="habitFeed" class="habit-feed"></section>
+
+    <p id="emptyState" class="empty-state hidden">
+      Aún no tienes hábitos. Toca <strong>+</strong> para crear el primero.
+    </p>
+
+    <button id="addHabitFab" class="fab" title="Agregar hábito">+</button>
+  </main>
+
+  <!-- ===================== DETAIL VIEW ===================== -->
+  <main id="detailView" class="view hidden">
+    <header class="detail-header">
+      <button id="backBtn" class="icon-btn">‹</button>
+      <div class="detail-title">
+        <span id="detailIcon" class="detail-icon"></span>
+        <div>
+          <h2 id="detailName">Hábito</h2>
+          <p id="detailDesc">Descripción</p>
+        </div>
+      </div>
+      <button id="deleteHabitBtn" class="icon-btn" title="Eliminar hábito">🗑</button>
+    </header>
+
+    <div class="detail-grid-wrap">
+      <div class="detail-tabs">
+        <button class="tab-btn active" data-range="week">Semana</button>
+        <button class="tab-btn" data-range="month">Mes</button>
+        <button class="tab-btn" data-range="year">Año</button>
+      </div>
+      <div id="detailGrid" class="grid-container"></div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <p class="stat-label">Racha Actual</p>
+        <p class="stat-value">🔥 <span id="statStreak">0</span> <small>días</small></p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Tiempo Desde el Inicio</p>
+        <p class="stat-value">🕐 <span id="statSince">0</span> <small>días</small></p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Completados</p>
+        <p class="stat-value">✅ <span id="statCompletions">0</span> <small>veces</small></p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-label">Días Perdidos</p>
+        <p class="stat-value">🗓 <span id="statMissed">0</span> <small>días</small></p>
+      </div>
+    </div>
+
+    <button id="toggleTodayBtn" class="primary-btn">✓ Marcar hoy</button>
+  </main>
+
+  <!-- ===================== ADD/EDIT HABIT MODAL ===================== -->
+  <div id="habitModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Nuevo Hábito</h3>
+        <button id="closeModalBtn" class="icon-btn">✕</button>
+      </div>
+
+      <label class="field-label">Nombre</label>
+      <input id="habitNameInput" type="text" maxlength="30" placeholder="Ej. Meditación" />
+
+      <label class="field-label">Descripción (opcional)</label>
+      <input id="habitDescInput" type="text" maxlength="40" placeholder="Ej. Mindfulness diario" />
+
+      <label class="field-label">Icono</label>
+      <div id="iconPicker" class="icon-picker"></div>
+
+      <label class="field-label">Color</label>
+      <div id="colorPicker" class="color-picker"></div>
+
+      <button id="saveHabitBtn" class="primary-btn">Guardar Hábito</button>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
