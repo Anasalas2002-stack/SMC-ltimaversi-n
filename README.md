@@ -10,7 +10,11 @@ Sistema de finanzas personales con dos piezas conectadas:
 2. **`index.html`** — app de presupuesto de un solo archivo (Chart.js +
    `window.storage`), desplegable en GitHub Pages sin backend propio.
    Lee los movimientos directamente del Google Sheet vía Sheets API,
-   con el pegado manual como respaldo.
+   con el pegado manual como respaldo. Clasifica cada movimiento por
+   categoría de presupuesto automáticamente (palabra clave de comercio,
+   más memoria de lo que corregiste antes por descripción exacta y por
+   monto exacto — útil para recurrentes como el arriendo), y siempre te
+   deja revisar/corregir antes de confirmar.
 
 El Atajo de iPhone (SMS → Apps Script) no forma parte de este repo y no
 se modificó.

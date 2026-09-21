@@ -178,7 +178,7 @@
       <h2>Movimientos del Sheet</h2>
       <span class="sec-note">se leen directo de Google Sheets</span>
     </div>
-    <p class="hint">Trae los SMS que tu Atajo ya guardó en el Google Sheet — sin copiar y pegar nada. Necesitas configurar una sola vez el Spreadsheet ID y una API key de Google (ver detalles abajo).</p>
+    <p class="hint">Trae los SMS que tu Atajo ya guardó en el Google Sheet — sin copiar y pegar nada. Necesitas configurar una sola vez el Spreadsheet ID y una API key de Google (ver detalles abajo). La app recuerda cómo clasificaste cada descripción y cada monto exacto (ej. tu arriendo), y te sugiere la misma categoría la próxima vez.</p>
     <div class="form-card">
       <div class="form-row" style="align-items:center;">
         <button onclick="syncFromSheet()" id="sync-btn">Sincronizar desde el Sheet</button>
@@ -244,6 +244,7 @@
 <script>
 const MONTH_KEY = 'presupuesto-2026-09';
 const SYNC_CONFIG_KEY = 'presupuesto-sync-config';
+const LEARNED_CATEGORIES_KEY = 'presupuesto-categorias-aprendidas';
 
 const BUDGET = [
   { key: 'uber', name: 'Uber', budget: 415915 },
@@ -258,6 +259,7 @@ const BUDGET = [
   { key: 'suplementos', name: 'Suplementos', budget: 143333 },
   { key: 'tinte', name: 'Tinte de pelo', budget: 83333 },
   { key: 'psicologia', name: 'Psicología', budget: 510000 },
+  { key: 'arriendo', name: 'Arriendo', budget: 1020000 },
 ];
 
 // Palabras clave para auto-categorizar movimientos importados
@@ -327,7 +329,7 @@ const EXPENSES_DEFAULT = {
   telco: [
     {amount:147800, date:'2026-09-01', method:'Débito Bancolombia', desc:'UNE Telco (factura completa)'},
   ],
-  gimnasio: [], materiales: [], suplementos: [], tinte: [], psicologia: [],
+  gimnasio: [], materiales: [], suplementos: [], tinte: [], psicologia: [], arriendo: [],
 };
 
 let state = { expenses: {}, specials: [], income: [] };
@@ -336,6 +338,13 @@ let pendingImportOrigin = null; // 'manual' | 'sheet'
 let pendingImportUpToRow = null; // última fila del Sheet incluida en pendingImport
 
 let syncConfig = { spreadsheetId: '', sheetName: 'Movimientos', apiKey: '', lastImportedRow: 1 };
+
+// Memoria de categorización: qué categoría le pusiste la última vez a
+// una descripción exacta, y qué categoría le pusiste la última vez a
+// un monto exacto (útil para transferencias recurrentes — ej. arriendo —
+// donde la descripción es solo el nombre del destinatario y nunca
+// matchea una palabra clave de comercio, pero el monto sí se repite).
+let learned = { byDesc: {}, byAmount: {} };
 
 function freshDefaults(){
   return { expenses: JSON.parse(JSON.stringify(EXPENSES_DEFAULT)), specials: [...SPECIALS_DEFAULT], income: [...INCOME_DEFAULT] };
@@ -364,6 +373,7 @@ async function loadState(){
   try{
     await saveState();
     await loadSyncConfig();
+    await loadLearnedCategories();
     render();
   }catch(e){
     console.error('render error', e);
@@ -415,6 +425,70 @@ function setSyncStatus(msg, isError){
   el.className = 'sync-status ' + (isError ? 'error' : 'ok');
 }
 
+// ---------- Memoria de categorización (aprende de tus correcciones) ----------
+// Igual que syncConfig, vive aparte del estado del mes: lo que aprendiste
+// sobre una descripción o un monto sigue siendo válido aunque reinicies
+// el mes.
+
+async function loadLearnedCategories(){
+  try{
+    const r = await window.storage.get(LEARNED_CATEGORIES_KEY);
+    const parsed = JSON.parse(r.value);
+    learned = {
+      byDesc: (parsed && typeof parsed.byDesc === 'object') ? parsed.byDesc : {},
+      byAmount: (parsed && typeof parsed.byAmount === 'object') ? parsed.byAmount : {},
+    };
+  }catch(e){
+    learned = { byDesc: {}, byAmount: {} };
+  }
+}
+
+async function saveLearnedCategories(){
+  try{ await window.storage.set(LEARNED_CATEGORIES_KEY, JSON.stringify(learned)); }catch(e){ console.error('storage error', e); }
+}
+
+function normalizeDesc(desc){
+  return (desc || '').toUpperCase().trim().replace(/\s+/g, ' ');
+}
+
+function amountKey(amount){
+  return String(Math.round(amount));
+}
+
+// Sugiere una categoría en orden de confianza:
+// 1) ya clasificaste antes exactamente esta misma descripción
+// 2) la descripción contiene una palabra clave de comercio conocida
+// 3) ya clasificaste antes un movimiento por este mismo monto exacto
+//    (se revisa después de las palabras clave para que un monto que
+//    coincida por casualidad no le gane a un comercio identificado)
+// 4) por defecto, Gastos materiales
+function categorize(desc, amount){
+  const descKey = normalizeDesc(desc);
+  if(descKey && learned.byDesc[descKey]){
+    return { category: learned.byDesc[descKey], source: 'desc' };
+  }
+  for(const key in KEYWORDS){
+    if(KEYWORDS[key].some(k => descKey.includes(k))) return { category: key, source: 'keyword' };
+  }
+  if(amount){
+    const amtKey = amountKey(amount);
+    if(learned.byAmount[amtKey]){
+      return { category: learned.byAmount[amtKey], source: 'amount' };
+    }
+  }
+  return { category: 'materiales', source: 'default' };
+}
+
+function guessCategory(desc, amount){
+  return categorize(desc, amount).category;
+}
+
+function learnFromConfirmed(desc, amount, category){
+  const descKey = normalizeDesc(desc);
+  if(descKey) learned.byDesc[descKey] = category;
+  if(amount) learned.byAmount[amountKey(amount)] = category;
+}
+
 // Trae de la Sheets API v4 las filas nuevas desde `sinceRow` (1-indexed,
 // fila de encabezado = 1) hasta el final de la pestaña. Requiere que el
 // Sheet esté compartido como "Cualquiera con el enlace puede ver" y que
@@ -441,11 +515,14 @@ function rowsToPending(rows, startRow){
     const descripcion = r[1] || '';
     const montoRaw = r[2] || '0';
     const amount = Math.abs(parseFloat(String(montoRaw).replace(/,/g, '')) || 0);
+    const finalDesc = descripcion || '(sin descripción)';
+    const guess = categorize(finalDesc, amount);
     return {
-      desc: descripcion || '(sin descripción)',
+      desc: finalDesc,
       amount,
       date: fecha || new Date().toISOString().slice(0,10),
-      category: guessCategory(descripcion),
+      category: guess.category,
+      categorySource: guess.source,
       sheetRow: startRow + i,
     };
   }).filter(t => t.amount > 0);
@@ -504,14 +581,6 @@ function addExpense(){
   render();
 }
 
-function guessCategory(desc){
-  const up = desc.toUpperCase();
-  for(const key in KEYWORDS){
-    if(KEYWORDS[key].some(k => up.includes(k))) return key;
-  }
-  return 'materiales';
-}
-
 function parseImport(){
   const raw = document.getElementById('import-text').value.trim();
   if(!raw) return;
@@ -527,11 +596,15 @@ function parseImport(){
     if(dateMatch) desc = desc.replace(dateMatch[0], '');
     if(amtMatch) desc = desc.replace(amtMatch[0], '');
     desc = desc.replace(/[-;|]/g, ' ').trim();
+    const finalDesc = desc || line;
+    const finalAmount = Math.abs(amount);
+    const guess = categorize(finalDesc, finalAmount);
     return {
-      desc: desc || line,
-      amount: Math.abs(amount),
+      desc: finalDesc,
+      amount: finalAmount,
       date: dateMatch ? normalizeDate(dateMatch[0]) : new Date().toISOString().slice(0,10),
-      category: guessCategory(desc),
+      category: guess.category,
+      categorySource: guess.source,
     };
   }).filter(t => t.amount > 0);
   pendingImportOrigin = 'manual';
@@ -558,10 +631,11 @@ function renderImportPreview(){
     confirmBox.style.display = 'none';
     return;
   }
+  const sourceLabel = { desc: 'recordada', amount: 'por monto' };
   box.innerHTML = pendingImport.map((t,i) => `
     <div class="import-row">
-      <span class="desc">${t.desc}</span>
-      <select onchange="pendingImport[${i}].category=this.value">
+      <span class="desc">${t.desc}${sourceLabel[t.categorySource] ? ` <span class="tag ok">${sourceLabel[t.categorySource]}</span>` : ''}</span>
+      <select onchange="pendingImport[${i}].category=this.value; pendingImport[${i}].categorySource='manual'">
         ${BUDGET.map(c => `<option value="${c.key}" ${c.key===t.category?'selected':''}>${c.name}</option>`).join('')}
       </select>
       <span class="amt">${money(t.amount)}</span>
@@ -575,7 +649,9 @@ function confirmImport(){
   pendingImport.forEach(t => {
     if(!state.expenses[t.category]) state.expenses[t.category] = [];
     state.expenses[t.category].push({ amount: t.amount, date: t.date, method, desc: t.desc });
+    learnFromConfirmed(t.desc, t.amount, t.category);
   });
+  saveLearnedCategories();
   if(pendingImportOrigin === 'sheet' && pendingImportUpToRow){
     syncConfig.lastImportedRow = pendingImportUpToRow;
     saveSyncConfigToStorage();
