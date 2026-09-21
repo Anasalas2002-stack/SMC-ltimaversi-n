@@ -1,0 +1,20 @@
+{
+  "name": "finanzas-automatico-apps-script",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Proyecto Apps Script (gestionado con clasp) que recibe SMS bancarios y los registra en Google Sheets.",
+  "scripts": {
+    "login": "clasp login",
+    "clone": "clasp clone",
+    "push": "clasp push",
+    "watch": "clasp push --watch",
+    "pull": "clasp pull",
+    "open": "clasp open",
+    "deploy": "clasp deploy",
+    "deployments": "clasp deployments",
+    "test": "node --test tests/*.test.js"
+  },
+  "devDependencies": {
+    "@google/clasp": "^2.4.2"
+  }
+}

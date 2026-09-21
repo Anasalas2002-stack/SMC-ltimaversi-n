@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Presupuesto">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FFFFFF">
+<title>Presupuesto — Anamaría</title>
+<link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAIAAACyr5FlAAAJDElEQVR4nO3dv67cRBQG8G+G0NMjAUmIAhIPAIQbKio66ogX5B0ouEABFQ0SoCQoSCBR0NHQmOJ6d+35Z/uMd/bz+hulWDn3njn3nJ927bn2XPfs7c/QdQ7o/3X9CwxeH49j/DWH113yOKKYmeOdAxDNlcshOt4tnA7j6bqF0wWlCEu3oBTo83AOAJzD8XX/wsGheNB1p28cfEEQzR3mG0Zzh2xcFPn4wkuGZCRlOAcvGZKRlIETDsmQjOiglwzJSMqAg5cMycgd9JIhGemDdzgkQzJiGQC8ZEhGUoYbnnNIhmQE0cJ1DsmQjGPk0TqHZEjGIHJ3WueQDMkYysDxnEMyJCOQ4U6XspIhGWMZ6C9lJUMyIhmHE1LJkIxIBlLrHJIhGf3BYJ1DMiTj9AXDdQ7JkIxRnsdzDsmQjDBPLxmSkUveS4Zk5JJPr3NIhmQguc4hGZKBwTmHZEhGIvnROodkSMbw4GmdQzIkIzjoJUMycsl7yZCMXPKHS1nJkIzoYPisrGRIxvHgnHUOydijDLhucp1DMnYqA1PrHJKxXxmuuM4hGbuWgfw6h2TsXYZDep1DMiQDcIl1DsmQjP5gsM4hGZJx+oLhOodkSMYoeS8ZkpFL3kuGZOSS95IhGbnkvWRIRi55LxmSkUt+7t7nkrE3GZi597lk7FAGgvs5JEMyhslP7H0uGbuVgfLe55KxZxmusPe5ZOxcBnJ7n0uGZLjk3ueSIRl33z65ziEZO5UBh3uSsXpxH736BsXx++MbfhkOdzgkY6XiTrK4G+/8cgvg1fs3zDKQ/xtvkmEp7rLBLcNl1jkkw1LcmW8bx/HWz7fMMpBa55AMa3FNg1aGi9Y5JKOiuNclA+N1DsmoKq5lEMvA4H4OyagursEGsQyHwQ3GklFZXNNgST6WgeMNxpKxQnENgyf5SIZbvmGcZGSLa7FBk3wsAws3jJOMYnFNgyX5KJpbsmGcZEwV97pkYPaGcZIxXVyTDpbkkwfnbowvGdPFNdjgST4+OHNjfMmYU1zj4Eg+loE5G+NLxtziXpcMN7kxvmTML67FBk3ysQyU1zkkY1lxLTpoko+iucI6h2QsLq7FBk3yiSJ39yTDOTz+c+I+nRcPbyaLaxnEMhDfYLw3Ge/9Nev2rQfPbwG8fHSDYnGXDmYZiNc5diVjcUdXlXGKSSkDwTrH3mRMfpoE4/6vt6XiGgaxDAw3b9mbDJjaWShuZTQ2GScce5RhamexuPZohDIQbRi3IxnWbuaLa43GKQNutGHczmSYdeSKa4pGKwOjG4x3JsP+QZAqri0aswycdjCWjPntXEkGQC0D/Q3Gu5RR5SOSURvNkPyZZSD/IPUOZLiVn1GzR7Mlf2YZOG7egh3KMLUzJ8N+BmNN/twysGTDuGuTYezmijJALQNu7oZx1yjD2NFs8pZBLAPzNoy7Thn2D4Jc8oZgxDIwf2N8XJ8MczszyZvC2ZM/twzEz61gNzJs3SwlXx2NSgaC+zmwKxmmfhaSr4zGJgOT6xy4Yhmmdk4kb41GKAPljfFx1TKM3VxRBqhloLDOgauXYe1oLnljMFYZyK1zYAcyqj4IkskbghHLQHKdAzuRUdHOZPKmcLwyEG+Mj93IsHWzlHx1NCoZCJ5bwXZkTD5v8vxBtPl8XFxLN7PJV0Zjk3HAsSkZMx9DevjiFsDLdw+bz6eKa+tn6SeyRiOUgeM5BzYiw1D9cnEXxysmb4vGKQOnS9mNyJj5tnEc93+7XVFGP1aS0QdjlQF33DBuCzKq3rqTxa2ONkreEIxYBg6/W9mIDHsD0sWtjBYkbwrHKwMOfksyjA0oFNceLZF8bTQuGYjv5wCxDGs388W1RksmXxeNTgaC+zlALsOsI1dcU7Rs8vZojDIwvJ8D9DKqGhAVt+oUMpO8KRqpDETrHFcnA2vKANaUAVDLALrhOge7jCofkYzaaHHyhlDglYHBOscWZJhXIZMybO3MJ28KxysD8/c+p5BhbUBShv0MJp98ZTQqGZi59zmJDGP9V5SBVWWMo7HJgJux9zmRDGMPsslbRiH5imiEMuCm9j6nklHVgGTyhmCF5K3ROGXAFfc+p5NhbkAmeVO4bPK2aLQyUPobbwCbDFv9S8lXRxslbwgFXhlwub/xBjDKMHWgkHxltCB5UzheGUj/jTeAVIa1AaXkrdGSyVdGo5KBxDoHQCvDWP8VZWBVGaCWgXCdA6CWYe1BLnljsFzyFdEIZWD03ApALqPqrTuZvCFYIXlrNE4ZGG2Mzy+jop3J5E3hssnbotHKwOAp+w3IsNW/lHx1tFHyhmDEMnB4NGEjMkwdKCRfGS1I3jR4ZcDBb0mGrQHln8gaLZG8KRqtDDj4DclwDn98cLOo+H9/+Ekh+X8+fbIo2r+fPykk/98XHy+Khi8/YpYBB78hGf03LhnTyS+PVkp+WThqGXBwP/inW5LRv+7e/OnbcuXL7xlB8m98/V05Wvk9I0j+9a++n2BB/57R/zg/vvZ0czJSB7eU/CZkYHjOsaHiSkYDGTiec2youJLRRgbufmW/oeJKRjMZcN3hY2ULxZWMljLQf6xsobiS0VgG+hNS+uJKRnsZ6H+3wl1cybiIDExcyhIUVzIuJQOlS1mC4krGBWUgeylLUFzJuKwMnD5WyIorGReXgcSlLEFxJYNBBsJLWYLiSgaJDIwuZQmKKxk8MjA457h8cSWDSgbQeZLiSgabDDh4huJKBqEM9E/ZS4ZkpOaKL2UlQzIOOCRDMnJzDS9lJUMyxjgkQzLye4JJhmRk/stLhmTkcUiGZORwSIZk5P6FT9mfqbiSsUq3Gs/lJUMycnH8uYsrGSt2q/FcXjJyyRN2q/Fc/nzFlYzVu9V4rvCJN8lg7lbjuUZPvEkGebcazxVcykoGdbcaz+UlQzJy/+VXLK5knLtbjefykrGhbjWey0vGhrrVeK7wNkFDcSWjWbcazzW6TdBQXMlo2a3Gc4VP2S8qrmQ07lbjubxkbKhbjec6nXMsKq5kXKRbjefyhuJKxqW61Xiu6LeykkHcrcZz5S9lU8WVjMt2q/FcmUvZVHEl4+LdajxX6lI2VVzJYOhW47n+B7X5fB80hIv2AAAAAElFTkSuQmCC">
+<link rel="icon" href="data:image/png;base64,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">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    --bg: #FFFFFF;
+    --surface: #FFFFFF;
+    --ink: #4A1638;
+    --ink-soft: #9C7089;
+    --line: #F3E1E9;
+    --coral: #FF5C39;
+    --coral-soft: #FFE7DE;
+    --gold: #FFC530;
+    --gold-soft: #FFF3D6;
+    --crimson: #C9003F;
+    --crimson-soft: #FBE1E9;
+    --plum: #5C1F45;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:'Inter',sans-serif; font-size:15px; line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:760px; margin:0 auto; padding:32px 20px 80px;}
+  h1{font-weight:700; font-size:28px; margin:0 0 2px; letter-spacing:-0.01em;}
+  .sub{color:var(--ink-soft); font-size:14px; margin:0 0 28px;}
+  .hero{
+    background:var(--surface); border:1px solid var(--line); border-radius:16px;
+    padding:26px 24px; margin-bottom:20px;
+  }
+  .hero-label{font-size:13px; color:var(--ink-soft); margin:0 0 6px;}
+  .hero-number{font-weight:700; font-size:44px; margin:0; letter-spacing:-0.01em; font-variant-numeric:tabular-nums;}
+  .hero-number.pos{color:var(--coral);}
+  .hero-number.neg{color:var(--crimson);}
+  .hero-note{font-size:13px; color:var(--ink-soft); margin-top:6px;}
+  .kpis{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:28px;}
+  .kpi{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px;}
+  .kpi-label{font-size:12px; color:var(--ink-soft); margin:0 0 4px;}
+  .kpi-value{font-size:17px; font-weight:600; margin:0; font-variant-numeric:tabular-nums;}
+  section{margin-bottom:32px;}
+  .sec-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:14px; gap:10px; flex-wrap:wrap;}
+  h2{font-weight:600; font-size:18px; margin:0;}
+  h3{font-weight:600; font-size:14.5px; margin:0 0 4px;}
+  .sec-note{font-size:13px; color:var(--ink-soft);}
+  .chart-card{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:20px 20px 10px;}
+  .cat-list{display:flex; flex-direction:column; gap:14px; margin-top:16px;}
+  .cat-row{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px;}
+  .cat-top{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;}
+  .cat-name{font-weight:500; font-size:14.5px;}
+  .cat-nums{font-size:13px; color:var(--ink-soft); font-variant-numeric:tabular-nums;}
+  .cat-nums b{color:var(--ink); font-weight:600;}
+  .bar-track{height:8px; background:var(--line); border-radius:4px; overflow:hidden; position:relative;}
+  .bar-fill{height:100%; border-radius:4px; background:var(--coral); transition:width .4s ease;}
+  .bar-fill.over{background:var(--crimson);}
+  .tag{display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px; margin-left:8px; font-weight:500;}
+  .tag.over{background:var(--crimson-soft); color:var(--crimson);}
+  .tag.ok{background:var(--gold-soft); color:#8A5A00;}
+  .cat-tx{margin-top:8px; padding-top:8px; border-top:1px dashed var(--line);}
+  .cat-tx-row{display:flex; justify-content:space-between; font-size:12px; color:var(--ink-soft); padding:2px 0;}
+  .form-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:16px;
+    display:flex; flex-direction:column; gap:10px; margin-top:14px;
+  }
+  .form-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .form-row > *{flex:1; min-width:110px;}
+  input, select, textarea{
+    font-family:'Inter',sans-serif; font-size:13.5px; border:1px solid var(--line); border-radius:8px;
+    padding:9px 10px; background:var(--bg); color:var(--ink); width:100%;
+  }
+  textarea{min-height:90px; resize:vertical; font-family:'Inter',sans-serif;}
+  button{
+    font-family:'Inter',sans-serif; font-size:13.5px; font-weight:600; border:1px solid var(--ink);
+    background:var(--ink); color:var(--surface); border-radius:8px; padding:10px 16px; cursor:pointer;
+  }
+  button.secondary{background:var(--surface); color:var(--ink);}
+  button:active{transform:scale(0.98);}
+  button:disabled{opacity:.5; cursor:default;}
+  .special-list{display:flex; flex-direction:column; gap:8px;}
+  .special-item{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:11px 16px;
+  }
+  .special-item .name{font-size:14px;}
+  .special-item .amt{font-weight:600; font-variant-numeric:tabular-nums; font-size:14px;}
+  .income-list{display:flex; flex-direction:column; gap:8px;}
+  .income-item{
+    display:flex; justify-content:space-between; align-items:center;
+    background:var(--gold-soft); border-radius:10px; padding:11px 16px;
+  }
+  .income-item .name{font-size:14px; color:#8A5A00;}
+  .income-item .amt{font-weight:600; color:#8A5A00; font-variant-numeric:tabular-nums; font-size:14px;}
+  .import-preview{margin-top:12px; display:flex; flex-direction:column; gap:6px;}
+  .import-row{
+    display:flex; justify-content:space-between; align-items:center; gap:8px;
+    background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12.5px;
+  }
+  .import-row select{width:150px; padding:5px 6px; font-size:12px;}
+  .import-row .desc{flex:1; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .import-row .amt{font-weight:600; min-width:90px; text-align:right;}
+  .hint{font-size:12px; color:var(--ink-soft); margin:0;}
+  .reset-link{font-size:12px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; background:none; border:none; padding:0; font-family:'Inter',sans-serif;}
+  .sync-status{font-size:12.5px; margin-top:4px;}
+  .sync-status.error{color:var(--crimson);}
+  .sync-status.ok{color:var(--ink-soft);}
+  .sync-toggle{font-size:12px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; background:none; border:none; padding:0; font-family:'Inter',sans-serif; text-align:left;}
+  details.settings{margin-top:10px;}
+  details.settings summary{cursor:pointer; font-size:12.5px; color:var(--ink-soft);}
+  footer{text-align:center; color:var(--ink-soft); font-size:12px; margin-top:40px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Tu presupuesto</h1>
+  <p class="sub" id="month-label">Septiembre 2026 · día 13 de 30</p>
+
+  <div class="hero">
+    <p class="hero-label">Balance del mes hasta hoy</p>
+    <p class="hero-number" id="hero-balance">$0</p>
+    <p class="hero-note" id="hero-note">Ingresos recibidos menos todo lo gastado o comprometido.</p>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><p class="kpi-label">Ingresos a hoy</p><p class="kpi-value" id="kpi-ingresos">$0</p></div>
+    <div class="kpi"><p class="kpi-label">Rutina gastada</p><p class="kpi-value" id="kpi-rutina">$0</p></div>
+    <div class="kpi"><p class="kpi-label">Especiales</p><p class="kpi-value" id="kpi-especiales">$0</p></div>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <h2>Presupuesto por categoría</h2>
+      <span class="sec-note">claro = presupuesto · coral/rojo = real</span>
+    </div>
+    <div class="chart-card">
+      <div style="position:relative; width:100%; height:280px;">
+        <canvas id="chart" role="img" aria-label="Barras horizontales comparando presupuesto mensual contra gasto real por categoría">Comparación de presupuesto contra gasto real por categoría</canvas>
+      </div>
+    </div>
+    <div class="cat-list" id="cat-list"></div>
+
+    <div class="form-card">
+      <p class="hint" style="margin:0 0 2px;">Añadir un gasto manual</p>
+      <div class="form-row">
+        <select id="add-cat"></select>
+        <input type="number" id="add-amt" placeholder="Monto">
+      </div>
+      <div class="form-row">
+        <input type="date" id="add-date">
+        <select id="add-method">
+          <option value="Tarjeta Banco de Bogotá">Tarjeta Banco de Bogotá</option>
+          <option value="Tarjeta Rappi">Tarjeta Rappi</option>
+          <option value="Débito Bancolombia">Débito Bancolombia</option>
+          <option value="Efectivo">Efectivo</option>
+        </select>
+      </div>
+      <button onclick="addExpense()">Añadir gasto</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Movimientos del Sheet</h2>
+      <span class="sec-note">se leen directo de Google Sheets</span>
+    </div>
+    <p class="hint">Trae los SMS que tu Atajo ya guardó en el Google Sheet — sin copiar y pegar nada. Necesitas configurar una sola vez el Spreadsheet ID y una API key de Google (ver detalles abajo).</p>
+    <div class="form-card">
+      <div class="form-row" style="align-items:center;">
+        <button onclick="syncFromSheet()" id="sync-btn">Sincronizar desde el Sheet</button>
+        <span class="sync-status" id="sync-status"></span>
+      </div>
+      <details class="settings" id="sync-settings">
+        <summary>Configuración de conexión con Google Sheets</summary>
+        <div class="form-card" style="margin-top:10px;">
+          <div class="form-row">
+            <input type="text" id="cfg-spreadsheet-id" placeholder="Spreadsheet ID (de la URL del Sheet)">
+          </div>
+          <div class="form-row">
+            <input type="text" id="cfg-sheet-name" placeholder="Nombre de la pestaña (ej: Movimientos)">
+          </div>
+          <div class="form-row">
+            <input type="text" id="cfg-api-key" placeholder="API key de Google Cloud">
+          </div>
+          <p class="hint">La API key y el Spreadsheet ID se guardan solo en este dispositivo (nunca en el código fuente). Ver docs/SETUP.md para cómo conseguirlos.</p>
+          <button onclick="saveSyncConfig()">Guardar configuración</button>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Importar movimientos manualmente</h2>
+      <span class="sec-note">pega las líneas de tu extracto</span>
+    </div>
+    <p class="hint">Respaldo para cuando no vienen del Sheet: copia y pega filas de tu extracto (fecha, descripción y monto, en cualquier orden reconocible) — una por línea.</p>
+    <div class="form-card">
+      <textarea id="import-text" placeholder="Ej: 09/09/2026 CARULLA CALLE 63 -181.991"></textarea>
+      <button onclick="parseImport()">Reconocer movimientos</button>
+    </div>
+    <div class="import-preview" id="import-preview"></div>
+    <div id="import-confirm" style="display:none; margin-top:10px;">
+      <button onclick="confirmImport()">Agregar estos gastos</button>
+      <button class="secondary" onclick="cancelImport()" style="margin-left:8px;">Cancelar</button>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Gastos especiales</h2>
+      <span class="sec-note">viaje, deudas, vivienda — no compiten con lo rutinario</span>
+    </div>
+    <div class="special-list" id="special-list"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Ingresos</h2>
+    </div>
+    <div class="income-list" id="income-list"></div>
+  </section>
+
+  <footer>
+    Datos guardados en este dispositivo · <button class="reset-link" onclick="resetMonth()">reiniciar el mes</button>
+  </footer>
+
+</div>
+
+<script>
+const MONTH_KEY = 'presupuesto-2026-09';
+const SYNC_CONFIG_KEY = 'presupuesto-sync-config';
+
+const BUDGET = [
+  { key: 'uber', name: 'Uber', budget: 415915 },
+  { key: 'mercado', name: 'Mercado', budget: 550000 },
+  { key: 'salud', name: 'Salud', budget: 94000 },
+  { key: 'suscripciones', name: 'Suscripciones', budget: 200000 },
+  { key: 'domicilios', name: 'Domicilios', budget: 200000 },
+  { key: 'peluqueria', name: 'Peluquería', budget: 85400 },
+  { key: 'telco', name: 'Telco (factura completa)', budget: 147800 },
+  { key: 'gimnasio', name: 'Gimnasio', budget: 70250 },
+  { key: 'materiales', name: 'Gastos materiales', budget: 150000 },
+  { key: 'suplementos', name: 'Suplementos', budget: 143333 },
+  { key: 'tinte', name: 'Tinte de pelo', budget: 83333 },
+  { key: 'psicologia', name: 'Psicología', budget: 510000 },
+];
+
+// Palabras clave para auto-categorizar movimientos importados
+const KEYWORDS = {
+  uber: ['UBER', 'PAYU*UBER', 'PAYU UBER'],
+  mercado: ['JENAGRO', 'CARULLA', 'TIENDA D1', 'EXITO', 'ÉXITO', 'SUPERTIEND', 'D1 '],
+  salud: ['COLSANITAS', 'CRUZ VERDE', 'DROGUERIA', 'FARMATODO'],
+  suscripciones: ['APPLE.COM', 'SPOTIFY', 'ROKU', 'MUBI', 'NETFLIX', 'RECHARGE.COM'],
+  domicilios: ['RAPPI', 'DOMICILIO'],
+  peluqueria: ['PELUQUER', 'BOLD SA*PELUQUER', 'BOLD SA PELUQUER'],
+  telco: ['UNE TELCO', 'TIGO', 'CLARO', 'MOVISTAR'],
+  gimnasio: ['SPINNING', 'GIMNASIO', 'GYM'],
+};
+
+const SPECIALS_DEFAULT = [
+  { name: 'Chocó — hotel (tu parte)', amount: 750000 },
+  { name: 'Chocó — vuelo Satena', amount: 1071000 },
+  { name: 'Deudas mamá (pagado)', amount: 477000 },
+  { name: 'Administración Casa de Campo', amount: 1200000 },
+  { name: 'Administración Lausana (real)', amount: 532900 },
+  { name: 'Pago RappiCard (deuda de agosto)', amount: 603549 },
+  { name: 'Regalo a Oskar', amount: 40000 },
+];
+
+const INCOME_DEFAULT = [
+  { name: 'Mamá', amount: 1700000 },
+  { name: 'Salario Naur (atrasado de agosto)', amount: 1750976 },
+  { name: 'Papá — Lausana', amount: 2900000 },
+];
+
+// Cada categoría guarda una lista de movimientos: {amount, date, method, desc}
+const EXPENSES_DEFAULT = {
+  uber: [
+    {amount:30474, date:'2026-09-03', method:'Tarjeta Banco de Bogotá', desc:'Uber Rides'},
+    {amount:23718, date:'2026-09-04', method:'Tarjeta Banco de Bogotá', desc:'Uber Rides'},
+    {amount:29893, date:'2026-09-05', method:'Tarjeta Banco de Bogotá', desc:'Uber Rides'},
+    {amount:20074, date:'2026-09-06', method:'Tarjeta Banco de Bogotá', desc:'Uber Rides'},
+    {amount:23517, date:'2026-09-07', method:'Tarjeta Banco de Bogotá', desc:'Uber Rides'},
+    {amount:11067, date:'2026-09-08', method:'Tarjeta Banco de Bogotá', desc:'Uber Rides'},
+    {amount:15395, date:'2026-09-08', method:'Tarjeta Banco de Bogotá', desc:'Uber Rides'},
+    {amount:14482, date:'2026-09-10', method:'Tarjeta Banco de Bogotá', desc:'Uber Rides'},
+    {amount:16212, date:'2026-09-10', method:'Tarjeta Banco de Bogotá', desc:'Uber Rides'},
+    {amount:7981, date:'2026-09-12', method:'Tarjeta Banco de Bogotá', desc:'Uber Rides'},
+  ],
+  mercado: [
+    {amount:15300, date:'2026-09-01', method:'Débito Bancolombia', desc:'Supertiendas'},
+    {amount:181991, date:'2026-09-09', method:'Tarjeta Banco de Bogotá', desc:'Carulla Calle 63'},
+    {amount:13585, date:'2026-09-10', method:'Tarjeta Banco de Bogotá', desc:'Jenagro 65 SAS'},
+  ],
+  salud: [
+    {amount:42880, date:'2026-09-02', method:'Débito Bancolombia', desc:'Cruz Verde'},
+    {amount:94800, date:'2026-09-08', method:'Tarjeta Banco de Bogotá', desc:'Colsanitas CM El Nogal'},
+  ],
+  suscripciones: [
+    {amount:99900, date:'2026-09-01', method:'Tarjeta Banco de Bogotá', desc:'Apple.com/Bill'},
+    {amount:25099, date:'2026-09-12', method:'Tarjeta Banco de Bogotá', desc:'Roku for MUBI'},
+  ],
+  domicilios: [
+    {amount:5000, date:'2026-09-04', method:'Débito Bancolombia', desc:'Mónica Pieda'},
+    {amount:4800, date:'2026-09-09', method:'Tarjeta Banco de Bogotá', desc:'Rappi'},
+    {amount:6000, date:'2026-09-09', method:'Tarjeta Banco de Bogotá', desc:'Rappi'},
+    {amount:40824, date:'2026-09-10', method:'Tarjeta Banco de Bogotá', desc:'La Birria Cl 85'},
+  ],
+  peluqueria: [
+    {amount:45000, date:'2026-09-03', method:'Tarjeta Banco de Bogotá', desc:'Bold SA Peluquer'},
+  ],
+  telco: [
+    {amount:147800, date:'2026-09-01', method:'Débito Bancolombia', desc:'UNE Telco (factura completa)'},
+  ],
+  gimnasio: [], materiales: [], suplementos: [], tinte: [], psicologia: [],
+};
+
+let state = { expenses: {}, specials: [], income: [] };
+let pendingImport = [];
+let pendingImportOrigin = null; // 'manual' | 'sheet'
+let pendingImportUpToRow = null; // última fila del Sheet incluida en pendingImport
+
+let syncConfig = { spreadsheetId: '', sheetName: 'Movimientos', apiKey: '', lastImportedRow: 1 };
+
+function freshDefaults(){
+  return { expenses: JSON.parse(JSON.stringify(EXPENSES_DEFAULT)), specials: [...SPECIALS_DEFAULT], income: [...INCOME_DEFAULT] };
+}
+
+function normalize(s){
+  if(!s || typeof s !== 'object') return freshDefaults();
+  if(!s.expenses || typeof s.expenses !== 'object') s.expenses = {};
+  BUDGET.forEach(c => {
+    if(!Array.isArray(s.expenses[c.key])){
+      s.expenses[c.key] = EXPENSES_DEFAULT[c.key] ? JSON.parse(JSON.stringify(EXPENSES_DEFAULT[c.key])) : [];
+    }
+  });
+  if(!Array.isArray(s.specials)) s.specials = [...SPECIALS_DEFAULT];
+  if(!Array.isArray(s.income)) s.income = [...INCOME_DEFAULT];
+  return s;
+}
+
+async function loadState(){
+  try{
+    const r = await window.storage.get(MONTH_KEY);
+    state = normalize(JSON.parse(r.value));
+  }catch(e){
+    state = freshDefaults();
+  }
+  try{
+    await saveState();
+    await loadSyncConfig();
+    render();
+  }catch(e){
+    console.error('render error', e);
+    state = freshDefaults();
+    render();
+  }
+}
+
+async function saveState(){
+  try{ await window.storage.set(MONTH_KEY, JSON.stringify(state)); }catch(e){ console.error('storage error', e); }
+}
+
+// ---------- Configuración de sincronización con Google Sheets ----------
+// Se guarda aparte del estado del mes: la config y el progreso de
+// sincronización (lastImportedRow) sobreviven a "reiniciar el mes",
+// porque el Sheet sigue creciendo aunque cambies de mes en la app.
+
+async function loadSyncConfig(){
+  try{
+    const r = await window.storage.get(SYNC_CONFIG_KEY);
+    const parsed = JSON.parse(r.value);
+    syncConfig = Object.assign({ spreadsheetId: '', sheetName: 'Movimientos', apiKey: '', lastImportedRow: 1 }, parsed);
+  }catch(e){
+    // sin configuración guardada todavía — se quedan los valores por defecto
+  }
+  document.getElementById('cfg-spreadsheet-id').value = syncConfig.spreadsheetId || '';
+  document.getElementById('cfg-sheet-name').value = syncConfig.sheetName || 'Movimientos';
+  document.getElementById('cfg-api-key').value = syncConfig.apiKey || '';
+  if(!syncConfig.spreadsheetId || !syncConfig.apiKey){
+    document.getElementById('sync-settings').open = true;
+  }
+}
+
+async function saveSyncConfigToStorage(){
+  try{ await window.storage.set(SYNC_CONFIG_KEY, JSON.stringify(syncConfig)); }catch(e){ console.error('storage error', e); }
+}
+
+function saveSyncConfig(){
+  syncConfig.spreadsheetId = document.getElementById('cfg-spreadsheet-id').value.trim();
+  syncConfig.sheetName = document.getElementById('cfg-sheet-name').value.trim() || 'Movimientos';
+  syncConfig.apiKey = document.getElementById('cfg-api-key').value.trim();
+  saveSyncConfigToStorage();
+  setSyncStatus('Configuración guardada.', false);
+}
+
+function setSyncStatus(msg, isError){
+  const el = document.getElementById('sync-status');
+  el.textContent = msg;
+  el.className = 'sync-status ' + (isError ? 'error' : 'ok');
+}
+
+// Trae de la Sheets API v4 las filas nuevas desde `sinceRow` (1-indexed,
+// fila de encabezado = 1) hasta el final de la pestaña. Requiere que el
+// Sheet esté compartido como "Cualquiera con el enlace puede ver" y que
+// la API key tenga habilitada la Google Sheets API (ver docs/SETUP.md).
+async function fetchSheetRows(sinceRow){
+  const range = encodeURIComponent(`${syncConfig.sheetName}!A${sinceRow + 1}:E`);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${syncConfig.spreadsheetId}/values/${range}?key=${syncConfig.apiKey}`;
+  const res = await fetch(url);
+  if(!res.ok){
+    let msg = `HTTP ${res.status}`;
+    try{
+      const body = await res.json();
+      if(body && body.error && body.error.message) msg = body.error.message;
+    }catch(e){ /* la respuesta no era JSON, se usa el status */ }
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  return data.values || [];
+}
+
+function rowsToPending(rows, startRow){
+  return rows.map((r, i) => {
+    const fecha = r[0] || '';
+    const descripcion = r[1] || '';
+    const montoRaw = r[2] || '0';
+    const amount = Math.abs(parseFloat(String(montoRaw).replace(/,/g, '')) || 0);
+    return {
+      desc: descripcion || '(sin descripción)',
+      amount,
+      date: fecha || new Date().toISOString().slice(0,10),
+      category: guessCategory(descripcion),
+      sheetRow: startRow + i,
+    };
+  }).filter(t => t.amount > 0);
+}
+
+async function syncFromSheet(){
+  if(!syncConfig.spreadsheetId || !syncConfig.apiKey){
+    setSyncStatus('Falta configurar el Spreadsheet ID y la API key (abre "Configuración" abajo).', true);
+    document.getElementById('sync-settings').open = true;
+    return;
+  }
+  const btn = document.getElementById('sync-btn');
+  btn.disabled = true;
+  setSyncStatus('Sincronizando…', false);
+  try{
+    const sinceRow = syncConfig.lastImportedRow || 1;
+    const rows = await fetchSheetRows(sinceRow);
+    if(rows.length === 0){
+      setSyncStatus('No hay movimientos nuevos en el Sheet.', false);
+      return;
+    }
+    pendingImport = rowsToPending(rows, sinceRow + 1);
+    pendingImportOrigin = 'sheet';
+    pendingImportUpToRow = sinceRow + rows.length;
+    if(pendingImport.length === 0){
+      setSyncStatus('Las filas nuevas no tenían un monto reconocible.', true);
+      return;
+    }
+    renderImportPreview();
+    setSyncStatus(`${pendingImport.length} movimiento(s) nuevo(s) — revisa las categorías abajo y confirma.`, false);
+  }catch(err){
+    setSyncStatus('Error al sincronizar: ' + err.message, true);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function money(n){
+  return '$' + Math.round(n).toLocaleString('es-CO');
+}
+
+function catTotal(key){
+  return (state.expenses[key] || []).reduce((a,t) => a + t.amount, 0);
+}
+
+function addExpense(){
+  const cat = document.getElementById('add-cat').value;
+  const val = parseFloat(document.getElementById('add-amt').value);
+  const date = document.getElementById('add-date').value || new Date().toISOString().slice(0,10);
+  const method = document.getElementById('add-method').value;
+  if(!val || val <= 0) return;
+  if(!state.expenses[cat]) state.expenses[cat] = [];
+  state.expenses[cat].push({ amount: val, date, method, desc: 'Manual' });
+  document.getElementById('add-amt').value = '';
+  saveState();
+  render();
+}
+
+function guessCategory(desc){
+  const up = desc.toUpperCase();
+  for(const key in KEYWORDS){
+    if(KEYWORDS[key].some(k => up.includes(k))) return key;
+  }
+  return 'materiales';
+}
+
+function parseImport(){
+  const raw = document.getElementById('import-text').value.trim();
+  if(!raw) return;
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  pendingImport = lines.map(line => {
+    const dateMatch = line.match(/(\d{4}-\d{2}-\d{2})|(\d{1,2}\/\d{1,2}\/\d{2,4})/);
+    const amtMatch = line.match(/-?\$?\s?([\d.,]{3,})\s*$/) || line.match(/-?\$?\s?([\d.,]{3,})/);
+    let amount = 0;
+    if(amtMatch){
+      amount = parseFloat(amtMatch[1].replace(/\./g,'').replace(',', '.'));
+    }
+    let desc = line;
+    if(dateMatch) desc = desc.replace(dateMatch[0], '');
+    if(amtMatch) desc = desc.replace(amtMatch[0], '');
+    desc = desc.replace(/[-;|]/g, ' ').trim();
+    return {
+      desc: desc || line,
+      amount: Math.abs(amount),
+      date: dateMatch ? normalizeDate(dateMatch[0]) : new Date().toISOString().slice(0,10),
+      category: guessCategory(desc),
+    };
+  }).filter(t => t.amount > 0);
+  pendingImportOrigin = 'manual';
+  pendingImportUpToRow = null;
+  renderImportPreview();
+}
+
+function normalizeDate(d){
+  if(d.includes('-')) return d;
+  const parts = d.split('/');
+  if(parts.length === 3){
+    let [a,b,y] = parts;
+    if(y.length === 2) y = '20' + y;
+    return `${y}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`;
+  }
+  return new Date().toISOString().slice(0,10);
+}
+
+function renderImportPreview(){
+  const box = document.getElementById('import-preview');
+  const confirmBox = document.getElementById('import-confirm');
+  if(pendingImport.length === 0){
+    box.innerHTML = '<p class="hint">No reconocí movimientos en ese texto — revisa el formato.</p>';
+    confirmBox.style.display = 'none';
+    return;
+  }
+  box.innerHTML = pendingImport.map((t,i) => `
+    <div class="import-row">
+      <span class="desc">${t.desc}</span>
+      <select onchange="pendingImport[${i}].category=this.value">
+        ${BUDGET.map(c => `<option value="${c.key}" ${c.key===t.category?'selected':''}>${c.name}</option>`).join('')}
+      </select>
+      <span class="amt">${money(t.amount)}</span>
+    </div>
+  `).join('');
+  confirmBox.style.display = 'block';
+}
+
+function confirmImport(){
+  const method = pendingImportOrigin === 'sheet' ? 'SMS (Sheet)' : 'Importado';
+  pendingImport.forEach(t => {
+    if(!state.expenses[t.category]) state.expenses[t.category] = [];
+    state.expenses[t.category].push({ amount: t.amount, date: t.date, method, desc: t.desc });
+  });
+  if(pendingImportOrigin === 'sheet' && pendingImportUpToRow){
+    syncConfig.lastImportedRow = pendingImportUpToRow;
+    saveSyncConfigToStorage();
+    setSyncStatus('Movimientos agregados. El Sheet queda al día.', false);
+  }
+  pendingImport = [];
+  pendingImportOrigin = null;
+  pendingImportUpToRow = null;
+  document.getElementById('import-text').value = '';
+  document.getElementById('import-preview').innerHTML = '';
+  document.getElementById('import-confirm').style.display = 'none';
+  saveState();
+  render();
+}
+
+function cancelImport(){
+  pendingImport = [];
+  pendingImportOrigin = null;
+  pendingImportUpToRow = null;
+  document.getElementById('import-preview').innerHTML = '';
+  document.getElementById('import-confirm').style.display = 'none';
+}
+
+async function resetMonth(){
+  state = freshDefaults();
+  await saveState();
+  render();
+}
+
+let chart;
+function render(){
+  const select = document.getElementById('add-cat');
+  select.innerHTML = BUDGET.map(c => `<option value="${c.key}">${c.name}</option>`).join('');
+  if(!document.getElementById('add-date').value){
+    document.getElementById('add-date').value = new Date().toISOString().slice(0,10);
+  }
+
+  const catList = document.getElementById('cat-list');
+  catList.innerHTML = '';
+  let totalRutina = 0;
+  BUDGET.forEach(c => {
+    const txs = state.expenses[c.key] || [];
+    const real = catTotal(c.key);
+    totalRutina += real;
+    const pct = Math.min(100, Math.round(real / c.budget * 100));
+    const over = real > c.budget;
+    const row = document.createElement('div');
+    row.className = 'cat-row';
+    const txList = txs.slice(-3).reverse().map(t => `
+      <div class="cat-tx-row"><span>${t.date} · ${t.method}</span><span>${money(t.amount)}</span></div>
+    `).join('');
+    row.innerHTML = `
+      <div class="cat-top">
+        <span class="cat-name">${c.name}${over ? '<span class="tag over">sobre tope</span>' : ''}</span>
+        <span class="cat-nums"><b>${money(real)}</b> / ${money(c.budget)}</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill ${over ? 'over' : ''}" style="width:${pct}%"></div></div>
+      ${txList ? `<div class="cat-tx">${txList}</div>` : ''}
+    `;
+    catList.appendChild(row);
+  });
+
+  const specialList = document.getElementById('special-list');
+  specialList.innerHTML = state.specials.map(s => `
+    <div class="special-item"><span class="name">${s.name}</span><span class="amt">${money(s.amount)}</span></div>
+  `).join('');
+  const totalEspeciales = state.specials.reduce((a,s) => a + s.amount, 0);
+
+  const incomeList = document.getElementById('income-list');
+  incomeList.innerHTML = state.income.map(i => `
+    <div class="income-item"><span class="name">${i.name}</span><span class="amt">${money(i.amount)}</span></div>
+  `).join('');
+  const totalIngresos = state.income.reduce((a,i) => a + i.amount, 0);
+
+  document.getElementById('kpi-ingresos').textContent = money(totalIngresos);
+  document.getElementById('kpi-rutina').textContent = money(totalRutina);
+  document.getElementById('kpi-especiales').textContent = money(totalEspeciales);
+
+  const balance = totalIngresos - totalRutina - totalEspeciales;
+  const heroEl = document.getElementById('hero-balance');
+  heroEl.textContent = money(Math.abs(balance));
+  heroEl.className = 'hero-number ' + (balance >= 0 ? 'pos' : 'neg');
+  document.getElementById('hero-note').textContent = balance >= 0
+    ? 'Vas en positivo — esto es lo que te sobra hasta ahora.'
+    : 'Vas en negativo — esto es lo que falta cubrir hasta ahora.';
+
+  const labels = BUDGET.map(c => c.name);
+  const presupuestos = BUDGET.map(c => c.budget);
+  const reales = BUDGET.map(c => catTotal(c.key));
+
+  if(chart) chart.destroy();
+  chart = new Chart(document.getElementById('chart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Presupuesto', data: presupuestos, backgroundColor: '#FFE7DE', borderRadius: 4, barThickness: 10 },
+        { label: 'Real', data: reales, backgroundColor: reales.map((v,i) => v > presupuestos[i] ? '#C9003F' : '#FF5C39'), borderRadius: 4, barThickness: 10 }
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + money(c.raw) } }
+      },
+      scales: {
+        x: { ticks: { color: '#9C7089', font:{size:11}, callback: (v) => '$' + (v/1000).toFixed(0) + 'K' }, grid: { color: '#F3E1E9' } },
+        y: { ticks: { color: '#4A1638', font: { size: 11.5 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+loadState();
+</script>
+</body>
+</html>
