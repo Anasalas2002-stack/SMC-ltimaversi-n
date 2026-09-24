@@ -1,161 +1,111 @@
-# Setup — Finanzas Automático
+# Setup — GastosMensuales
 
-Esta guía separa dos cosas:
+Flujo completo:
 
-- **Lo que ya quedó resuelto en el código** de este repo (no tienes que
-  hacer nada, solo desplegarlo).
-- **Lo que tienes que configurar tú a mano** en Google Cloud / Google
-  Sheets / GitHub, porque requiere tu cuenta y no se puede automatizar
-  desde aquí.
+```
+SMS del banco → Atajo de iPhone (barrido programado) → POST al Apps Script
+→ el Apps Script reconoce el SMS y lo guarda en el Google Sheet
+→ la app de presupuesto (GitHub Pages) lee el Sheet a través del mismo Apps Script
+```
 
-El Atajo de iPhone que envía los SMS al Apps Script **no se tocó** —
-sigue funcionando exactamente igual que antes.
+Esta guía separa lo que ya quedó resuelto en el código de lo que tienes
+que hacer tú, porque requiere tu cuenta de Google, de GitHub o tu iPhone.
 
 ---
 
-## 1. Lo que ya está automatizado en código
+## 1. Lo que ya está en el código
 
-- `apps-script/` — el proyecto de Apps Script listo para manejarse con
-  `clasp` (login una vez, luego `npm run push` / `npm run deploy` en vez
-  de copiar y pegar en el editor web).
-  - `apps-script/src/Code.gs` — el mismo código que ya tenías (`doPost`,
-    los parsers de SMS, `getSheet`), sin cambios de lógica.
-  - `apps-script/src/appsscript.json` — manifiesto del Web App.
-  - `apps-script/tests/parsers.test.js` — suite de pruebas que carga
-    `Code.gs` real y verifica los parsers contra los 2 ejemplos que
-    diste (Bancolombia Bre-B y Banco de Bogotá) más casos borde y el
-    fallback genérico. Correr con `npm test` dentro de `apps-script/`.
-- `index.html` — la app de presupuesto, en la raíz del repo para que
-  GitHub Pages la sirva sin configuración adicional. Sigue siendo un
-  solo archivo, sin backend propio. Se le agregó una sección
-  **"Movimientos del Sheet"** que trae los SMS ya parseados
-  directamente desde Google Sheets (Sheets API v4), con un botón
-  "Sincronizar desde el Sheet" que reemplaza el copiar y pegar manual.
-  El pegado manual se mantiene como respaldo, para extractos en PDF.
+- **`apps-script/src/Code.gs`**: el código del Web App.
+  - `doPost` recibe el texto crudo del SMS (`{"texto": "..."}`), reconoce
+    7 tipos de mensaje (compra con tarjeta de Banco de Bogotá; compra, pago
+    desde producto, transferencia enviada, transferencia recibida, pago QR y
+    ahorro en bolsillo de Bancolombia) y guarda la fila. Los duplicados se
+    descartan por ID, así que el mismo SMS se puede mandar muchas veces.
+  - `doGet?accion=movimientos&clave=...` devuelve todas las filas del Sheet
+    para la app. Pide una clave de lectura que vive en las propiedades del
+    script, no en el código (este repo es público).
+  - Fecha e ID se guardan como texto, para que Sheets no convierta
+    "05/10/2026" en 10 de mayo.
+- **`apps-script/tests/parsers.test.js`**: 16 pruebas con los SMS reales.
+  Se corren con `cd apps-script && npm test`. Cuando llegue un formato de
+  SMS nuevo, se agrega el ejemplo aquí antes de tocar la regex.
+- **`index.html`**: la app de presupuesto (un solo archivo).
+  - Botón **Sincronizar desde el Sheet**: trae los movimientos del mes que
+    todavía no has agregado y sugiere categoría. El ahorro y los pagos a la
+    tarjeta de Banco de Bogotá vienen marcados como "Ignorar" (no son gastos
+    nuevos) y las transferencias recibidas como "Ingreso".
+  - Guarda los datos en el navegador (localStorage), así que funciona en
+    GitHub Pages sin backend propio.
 
-## 2. Lo que tienes que hacer tú (una sola vez)
+## 2. Lo que tienes que hacer tú
 
-### 2.1. Vincular `clasp` a tu proyecto de Apps Script existente
+### 2.1. Actualizar el Apps Script
 
-1. Instala dependencias:
-   ```bash
-   cd apps-script
-   npm install
-   ```
-2. Inicia sesión (abre el navegador, pide permiso a tu cuenta de
-   Google):
-   ```bash
-   npm run login
-   ```
-3. Consigue el **Script ID** de tu proyecto actual: abre tu Google
-   Sheet → Extensiones → Apps Script → ⚙️ Configuración del proyecto →
-   copia el "ID del proyecto de secuencia de comandos".
-4. Copia la plantilla y pega ahí el Script ID:
-   ```bash
-   cp .clasp.json.example .clasp.json
-   ```
-   y edita `.clasp.json` con el Script ID real. (Este archivo queda
-   fuera de git — cada quien lo crea localmente.)
-5. Trae lo que hay actualmente en Google para comparar contra lo que
-   quedó en `src/Code.gs`:
-   ```bash
-   npm run pull
-   ```
-   Si tu proyecto en la nube tiene archivos con otro nombre o contenido
-   distinto (por ejemplo, si lo editaste en el navegador después de
-   pasarme el código), reconcilia a mano antes de seguir — `src/Code.gs`
-   debe quedar como la única fuente de verdad.
-6. De ahí en adelante, para desplegar un cambio:
-   ```bash
-   npm run push          # sube el código al proyecto de Apps Script
-   npm run deployments    # lista tus deployments existentes y sus IDs
-   npx clasp deploy -i <DEPLOYMENT_ID>   # actualiza ESE deployment sin cambiar su URL
-   ```
-   Importante: si corres `npm run deploy` sin `-i`, clasp crea un
-   deployment **nuevo** con una URL distinta, y tu Atajo de iPhone
-   dejaría de apuntar al lugar correcto. Usa siempre `-i` con el ID del
-   deployment que ya está conectado al Atajo (ese ID sale de
-   `npm run deployments`).
+1. Abre tu proyecto de Apps Script, reemplaza todo el contenido de
+   `Código.gs` con [`apps-script/src/Code.gs`](../apps-script/src/Code.gs)
+   y guarda.
+2. **Crea la clave de lectura**: ⚙️ **Configuración del proyecto** →
+   **Propiedades del script** → **Agregar propiedad del script**.
+   - Propiedad: `CLAVE_LECTURA`
+   - Valor: una frase larga que solo tú sepas (no la reutilices de otra cuenta).
+3. **Despliega sin cambiar la URL**: **Implementar → Administrar
+   implementaciones** → lápiz ✏️ → Versión: **Nueva versión** → **Implementar**.
+   No uses "Nueva implementación": eso crea otra URL y tus Atajos dejarían
+   de funcionar.
 
-### 2.2. Habilitar la Google Sheets API y crear una API key
+### 2.2. Publicar la app en GitHub Pages
 
-La app HTML necesita una API key de Google Cloud para leer el Sheet
-directamente (sin backend propio).
+El error 404 se debía a que GitHub Pages publica desde la rama por defecto
+del repo (`claude/habit-tracker-app-8ea1fe`), que está vacía.
 
-1. Ve a [Google Cloud Console](https://console.cloud.google.com/).
-2. Crea un proyecto nuevo o usa uno existente (puede ser el mismo que
-   ya usa tu cuenta de Google para otras cosas — no tiene que ser el
-   mismo proyecto del Apps Script).
-3. En **APIs y servicios → Biblioteca**, busca **Google Sheets API** y
-   haz clic en **Habilitar**.
-4. En **APIs y servicios → Credenciales → Crear credenciales → Clave de
-   API**, crea una API key nueva.
-5. Restringe la key (muy importante, es de solo lectura pero igual
-   conviene limitarla):
-   - **Restricciones de la aplicación** → "Referentes HTTP (sitios
-     web)" → agrega la URL de tu GitHub Pages, ej.
-     `https://tu-usuario.github.io/*`.
-   - **Restricciones de API** → "Restringir clave" → selecciona
-     únicamente **Google Sheets API**.
-6. Copia la key — la vas a pegar dentro de la app (paso 2.4), no en el
-   código.
-
-### 2.3. Compartir el Google Sheet para lectura pública
-
-Una API key (sin OAuth) solo puede leer un Sheet que esté compartido
-como público de solo lectura:
-
-1. Abre el Google Sheet → botón **Compartir**.
-2. En "Acceso general", cambia a **"Cualquiera con el enlace"** con rol
-   **Lector**.
-3. Copia el **Spreadsheet ID**: es la parte de la URL entre `/d/` y
-   `/edit`, ej. en
-   `https://docs.google.com/spreadsheets/d/1AbCdEfGhIjKlMnOpQrSt/edit`
-   el ID es `1AbCdEfGhIjKlMnOpQrSt`.
-
-   **Nota de privacidad:** esto hace que cualquiera con el enlace (no
-   indexado, pero no secreto) pueda leer el contenido del Sheet
-   completo, incluyendo el texto original de tus SMS. Si te incomoda,
-   considera mover el texto original a una pestaña aparte que no
-   compartas, o quitar esa columna antes de compartir.
-
-### 2.4. Configurar la app HTML con tus datos
-
-1. Abre `index.html` (localmente o ya publicado en GitHub Pages).
-2. En la sección **"Movimientos del Sheet"**, abre
-   "Configuración de conexión con Google Sheets".
-3. Pega:
-   - **Spreadsheet ID** (paso 2.3)
-   - **Nombre de la pestaña** (`Movimientos`, ya viene por defecto)
-   - **API key** (paso 2.2)
-4. Haz clic en **Guardar configuración**. Estos datos se guardan solo
-   en tu dispositivo (vía `window.storage`), nunca se suben al
-   repositorio.
-5. Haz clic en **Sincronizar desde el Sheet** cada vez que quieras
-   traer los movimientos nuevos. La app recuerda hasta qué fila del
-   Sheet ya importó, así que solo trae lo nuevo cada vez.
-
-### 2.5. Publicar en GitHub Pages
-
-1. En el repo de GitHub: **Settings → Pages**.
+1. En GitHub: **Settings → Pages**.
 2. **Source**: "Deploy from a branch".
-3. **Branch**: la rama donde quede este código (ej. `main`) → carpeta
-   `/ (root)`.
-4. Guarda. GitHub te da la URL pública (algo como
-   `https://tu-usuario.github.io/tu-repo/`) — esa es la URL que debes
-   usar como referente HTTP al restringir la API key (paso 2.2).
+3. **Branch**: `claude/personal-finance-integration-q3d50d`, carpeta `/ (root)` → **Save**.
+4. Espera 1 o 2 minutos y abre `https://anasalas2002-stack.github.io/SMC-ltimaversi-n/`.
 
----
+A futuro conviene tener una rama `main` con la versión estable y publicar
+desde ahí.
 
-## 3. Resumen rápido (checklist)
+### 2.3. Conectar la app con el Apps Script (una vez por dispositivo)
 
-- [ ] `clasp login` + `.clasp.json` con tu Script ID real
-- [ ] `npm run pull` y reconciliar contra `src/Code.gs`
-- [ ] Habilitar Google Sheets API en un proyecto de GCP
-- [ ] Crear API key, restringida a tu dominio de GitHub Pages y a
-      Sheets API
-- [ ] Compartir el Sheet como "Cualquiera con el enlace — Lector"
-- [ ] Pegar Spreadsheet ID + API key en la app (se guardan localmente)
-- [ ] Activar GitHub Pages apuntando a `index.html`
-- [ ] Confirmar que el Atajo de iPhone sigue apuntando al mismo
-      deployment URL de Apps Script (no cambia con nada de esto)
+1. Abre la app → sección **Movimientos del Sheet** → **Conexión con tu Apps Script**.
+2. Pega la URL del Web App (la que termina en `/exec`, la misma de tus
+   Atajos) y la `CLAVE_LECTURA`.
+3. **Guardar conexión** → **Sincronizar desde el Sheet**.
+
+La URL y la clave quedan guardadas solo en ese navegador.
+
+### 2.4. Los Atajos de iPhone (referencia)
+
+Dos Atajos, uno por banco, con la misma estructura:
+
+1. `Find Messages` con los filtros:
+   - `Body` **begins with** `Banco de Bogota:` (o `Bancolombia:`). Usa "begins
+     with" y no "contains", para que no encuentre mensajes que tú escribes.
+   - `Date` **is in the last** `2` days.
+   - `Limit` apagado.
+2. `Repeat with Each` sobre los mensajes encontrados.
+3. Dentro del bloque: `Get Contents of URL`.
+   - URL: la del Web App.
+   - Method: `POST`.
+   - Request Body: `JSON`, con un campo `texto` = `Repeat Item`.
+
+Para que corran solos, crea automatizaciones personales, por ejemplo **a
+cierta hora del día** o **al conectar el cargador**, con "Ejecutar
+inmediatamente". Cada barrido revisa los últimos 2 días y el Apps Script
+descarta lo que ya estaba.
+
+### 2.5. `clasp` (opcional)
+
+Solo si quieres desplegar el Apps Script desde la terminal en vez de pegar
+el código en el editor web:
+
+```bash
+cd apps-script
+npm install
+npm run login
+cp .clasp.json.example .clasp.json   # ya trae tu Script ID
+npm run push                          # sube el código
+npm run deployments                   # lista las implementaciones y sus IDs
+npx clasp deploy -i <ID_DE_LA_IMPLEMENTACION_ACTUAL>   # misma URL
+```

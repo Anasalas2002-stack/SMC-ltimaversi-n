@@ -1,44 +1,35 @@
-# Finanzas Automático + Presupuesto
+# GastosMensuales
 
-Sistema de finanzas personales con dos piezas conectadas:
+Control de gastos personal alimentado por los SMS del banco.
 
-1. **`apps-script/`** — Web App de Google Apps Script que recibe SMS
-   bancarios (enviados desde un Atajo de iPhone), los parsea con regex
-   y los guarda en un Google Sheet. Gestionado con
-   [`clasp`](https://github.com/google/clasp) para desplegar desde la
-   terminal en vez de copiar y pegar en el editor web.
-2. **`index.html`** — app de presupuesto de un solo archivo (Chart.js +
-   `window.storage`), desplegable en GitHub Pages sin backend propio.
-   Lee los movimientos directamente del Google Sheet vía Sheets API,
-   con el pegado manual como respaldo. Clasifica cada movimiento por
-   categoría de presupuesto automáticamente (palabra clave de comercio,
-   más memoria de lo que corregiste antes por descripción exacta y por
-   monto exacto — útil para recurrentes como el arriendo), y siempre te
-   deja revisar/corregir antes de confirmar.
+```
+SMS del banco → Atajo de iPhone → Apps Script → Google Sheet → app de presupuesto
+```
 
-El Atajo de iPhone (SMS → Apps Script) no forma parte de este repo y no
-se modificó.
+- **`apps-script/`**: Web App de Google Apps Script.
+  - Recibe el texto crudo de los SMS (Banco de Bogotá y Bancolombia), los
+    reconoce, descarta duplicados por ID y los guarda en el Sheet.
+  - También entrega los movimientos a la app, protegido por una clave de lectura.
+  - Se puede desplegar con [`clasp`](https://github.com/google/clasp) o pegando `src/Code.gs` en el editor.
+- **`index.html`**: app de presupuesto de un solo archivo (Chart.js), publicada en GitHub Pages.
+  - Sincroniza los movimientos del Sheet y sugiere la categoría de cada uno.
+  - Separa ingresos, ahorro y pagos de tarjeta para no contarlos como gasto.
 
 ## Estructura
 
 ```
-apps-script/          proyecto Apps Script gestionado con clasp
-  src/Code.gs          código del Web App (doPost, parsers, getSheet)
+apps-script/
+  src/Code.gs          Web App (doPost: SMS → Sheet, doGet: Sheet → app)
   src/appsscript.json  manifiesto
-  tests/               suite de pruebas de los parsers (node --test)
+  tests/               pruebas con SMS reales (node --test)
 index.html             app de presupuesto (GitHub Pages)
-docs/SETUP.md          qué configurar manualmente en Google Cloud/Sheets
+docs/SETUP.md          configuración manual paso a paso
 ```
 
-## Empezar
+## Pruebas
 
 ```bash
-# Pruebas de los parsers de SMS
-cd apps-script && npm install && npm test
-
-# Desplegar cambios del Apps Script (requiere clasp login previo)
-npm run push
+cd apps-script && npm test
 ```
 
-Ver [`docs/SETUP.md`](docs/SETUP.md) para la configuración manual
-completa (clasp, API key de Google Sheets, permisos, GitHub Pages).
+Configuración completa (Apps Script, GitHub Pages, Atajos): [`docs/SETUP.md`](docs/SETUP.md).

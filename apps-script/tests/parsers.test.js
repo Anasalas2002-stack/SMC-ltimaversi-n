@@ -1,92 +1,142 @@
-// Carga src/Code.gs (el archivo real que se despliega con `clasp push`)
-// dentro de un sandbox de vm y prueba los parsers de SMS contra él
-// directamente, para que un cambio de regex que rompa un banco ya
-// soportado falle aquí antes de llegar a producción.
+// Carga src/Code.gs (el mismo archivo que se pega/despliega en Apps Script)
+// en un sandbox de vm, con los servicios de Google simulados, y prueba los
+// parsers contra SMS reales. Si un cambio de regex rompe un banco que ya
+// funcionaba, falla aquí antes de llegar a producción.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function loadParsers() {
+function crearHoja(filasIniciales = []) {
+  const filas = filasIniciales.map(f => [...f]);
+  return {
+    filas,
+    getLastRow: () => filas.length,
+    appendRow: fila => filas.push([...fila]),
+    getRange: (row, col, numRows = 1, numCols = 1) => ({
+      setNumberFormat() {},
+      getValues: () => filas.slice(row - 1, row - 1 + numRows).map(f => f.slice(col - 1, col - 1 + numCols)),
+      setValues: valores => valores.forEach((v, i) => { filas[row - 1 + i] = [...v]; }),
+    }),
+  };
+}
+
+function cargarScript({ hoja = crearHoja([['Fecha', 'Descripción', 'Monto', 'Fuente', 'ID']]), claveLectura = 'secreta' } = {}) {
   const source = fs.readFileSync(path.join(__dirname, '..', 'src', 'Code.gs'), 'utf8');
   const context = {
-    ContentService: { createTextOutput: () => ({ setMimeType: () => {} }), MimeType: { JSON: 'JSON' } },
-    SpreadsheetApp: {},
     Logger: { log() {} },
+    ContentService: {
+      MimeType: { JSON: 'JSON' },
+      createTextOutput: texto => ({ texto, setMimeType() { return this; } }),
+    },
+    SpreadsheetApp: { openById: () => ({ getSheetByName: () => hoja, insertSheet: () => hoja }) },
+    PropertiesService: { getScriptProperties: () => ({ getProperty: k => (k === 'CLAVE_LECTURA' ? claveLectura : null) }) },
+    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
+    Session: { getScriptTimeZone: () => 'America/Bogota' },
+    Utilities: {
+      formatDate: d => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`,
+    },
   };
   vm.createContext(context);
   vm.runInContext(source, context, { filename: 'Code.gs' });
-  return context;
+  return { ctx: context, hoja };
 }
 
-const { parsearSMS, parseTransferenciaBreB, parseCompraBancoBogota } = loadParsers();
+const respuesta = salida => JSON.parse(salida.texto);
+const post = (ctx, body) => respuesta(ctx.doPost({ postData: { contents: JSON.stringify(body) } }));
 
-test('Bancolombia · transferencia Bre-B (ejemplo real)', () => {
-  const texto = 'ANA, transferiste $1,020,000.00 a la llave @rueda3611 desde tu cuenta *3335 a GLORIA ELISA RUEDA PINILLA el 16/09/26 a las 18:32. Con Bre-b es de una y gratis.';
-  const r = parseTransferenciaBreB(texto);
-  assert.ok(r, 'debería reconocer el mensaje de Bancolombia');
-  assert.equal(r.fecha, '2026-09-16');
-  assert.equal(r.monto, '1020000.00');
-  assert.equal(r.descripcion, 'GLORIA ELISA RUEDA PINILLA');
-  assert.equal(r.tipo, 'Transferencia');
+const SMS = {
+  bdbCompra: 'Banco de Bogota: Tu compra por 39,900 fue aprobada con Tarjeta Crédito 6359 el 21/09/26 18:41:12 en Rappi ¿Dudas? Llama a la Servilinea',
+  bcolCompra: 'Bancolombia: Compraste $8.800,00 en BOLD SA*DROGUERI con tu T.Deb *9275, el 19/09/2026 a las 12:29. Si tienes dudas, encuentranos aqui: 6045109095 o 018000931987. Estamos cerca.',
+  bcolPago: 'Bancolombia: Pagaste $350,000.00 a BANCO DAVIVIENDA SA desde tu producto 3335 el 18/09/2026 16:51:17. ¿Dudas? Llamanos al 6045109095. Estamos cerca',
+  bcolTransfEnviada: 'Bancolombia: ANA, transferiste $286,433.00 a la llave @riano9246 desde tu cuenta *3335 a JUAN RIANO el 18/09/26 a las 17:44. Con Bre-b es de una y gratis. Dudas al 018000912345',
+  bcolTransfRecibida: 'Bancolombia: Recibiste una transferencia por $532,900 de JOSE SALAS en tu cuenta **3335, el 13/09/2026 a las 16:21. Si tienes dudas, hablemos: 018000931987. Siempre a tu lado.',
+  bcolQR: 'Bancolombia: ANA MARIA SALAS GALINDO pagaste $9,200.00 por codigo QR desde tu cuenta *3335 a la llave 0092747202 el 13/09/2026 a las 17:07. Con codigo QR es facil y de una. Dudas al 018000912345',
+  bcolAhorro: 'Bancolombia: ANA, tu ahorro de $20.000 ya lo tienes en tu bolsillo Ahorro de tu cuenta de ahorros *3335, el 21/09/2026 a las 07:31. Vas muy bien. ¿Dudas? Llamanos al 6045109095.',
+};
+
+const CASOS = [
+  ['Banco de Bogotá · compra con tarjeta', SMS.bdbCompra, { fecha: '21/09/2026', descripcion: 'Rappi', monto: 39900, fuente: 'Banco de Bogotá', id: 'BDB-260921184112-39900' }],
+  ['Bancolombia · compra con débito', SMS.bcolCompra, { fecha: '19/09/2026', descripcion: 'BOLD SA*DROGUERI', monto: 8800, fuente: 'Bancolombia', id: 'BCOL-202609191229-8800-BOLDSA*DROGUERI' }],
+  ['Bancolombia · pago desde producto', SMS.bcolPago, { fecha: '18/09/2026', descripcion: 'BANCO DAVIVIENDA SA', monto: 350000, fuente: 'Bancolombia', id: 'BCOLPAG-20260918165117-350000' }],
+  ['Bancolombia · transferencia Bre-B enviada', SMS.bcolTransfEnviada, { fecha: '18/09/2026', descripcion: 'JUAN RIANO', monto: 286433, fuente: 'Bancolombia', id: 'BCOLTRF-2609181744-286433' }],
+  ['Bancolombia · transferencia recibida', SMS.bcolTransfRecibida, { fecha: '13/09/2026', descripcion: 'De JOSE SALAS', monto: 532900, fuente: 'Bancolombia', id: 'BCOLREC-202609131621-532900' }],
+  ['Bancolombia · pago con QR', SMS.bcolQR, { fecha: '13/09/2026', descripcion: 'QR a 0092747202', monto: 9200, fuente: 'Bancolombia', id: 'BCOLQR-202609131707-9200' }],
+  ['Bancolombia · ahorro en bolsillo', SMS.bcolAhorro, { fecha: '21/09/2026', descripcion: 'Ahorro en bolsillo', monto: 20000, fuente: 'Bancolombia', id: 'BCOLAHO-202609210731-20000' }],
+];
+
+for (const [nombre, texto, esperado] of CASOS) {
+  test(`parser · ${nombre}`, () => {
+    const { ctx } = cargarScript();
+    assert.deepEqual({ ...ctx.parsearSMS(texto) }, esperado);
+  });
+}
+
+test('parser · mensajes que no son movimientos no se reconocen', () => {
+  const { ctx } = cargarScript();
+  assert.equal(ctx.parsearSMS('Bancolombia: Tu clave dinamica es 123456. No la compartas.'), null);
+  assert.equal(ctx.parsearSMS('{"error":"No se pudo reconocer el formato del SMS.","ok":false}'), null);
 });
 
-test('Banco de Bogotá · compra con tarjeta (ejemplo real)', () => {
-  const texto = 'Banco de Bogota: Tu compra por 18,072 fue aprobada con Tarjeta Crédito 6359 el 20/09/26 02:04:31 en UBER*RIDES ¿Dudas? Llama a la Servilinea';
-  const r = parseCompraBancoBogota(texto);
-  assert.ok(r, 'debería reconocer el mensaje de Banco de Bogotá');
-  assert.equal(r.fecha, '2026-09-20');
-  assert.equal(r.monto, '18072');
-  assert.equal(r.descripcion, 'UBER*RIDES');
-  assert.equal(r.tipo, 'Compra tarjeta');
+test('parseMontoCOP · entiende los formatos de ambos bancos', () => {
+  const { ctx } = cargarScript();
+  const casos = { '20.000': 20000, '8.800,00': 8800, '350,000.00': 350000, '532,900': 532900, '1.020.000': 1020000, '45.5': 45.5 };
+  for (const [entrada, esperado] of Object.entries(casos)) {
+    assert.equal(ctx.parseMontoCOP(entrada), esperado, entrada);
+  }
 });
 
-test('parsearSMS despacha correctamente: Bancolombia', () => {
-  const texto = 'ANA, transferiste $50,000.00 a la llave @juan123 desde tu cuenta *1111 a JUAN PEREZ el 01/01/26 a las 09:00. Con Bre-b es de una y gratis.';
-  const r = parsearSMS(texto);
-  assert.equal(r.tipo, 'Transferencia');
-  assert.equal(r.descripcion, 'JUAN PEREZ');
+test('doPost · registra un SMS y descarta el mismo SMS la segunda vez', () => {
+  const { ctx, hoja } = cargarScript();
+  assert.deepEqual(post(ctx, { texto: SMS.bdbCompra }), { ok: true, message: 'Movimiento registrado.' });
+  assert.equal(post(ctx, { texto: SMS.bdbCompra }).duplicate, true);
+  assert.equal(hoja.filas.length, 2);
+  assert.deepEqual(hoja.filas[1], ['21/09/2026', 'Rappi', 39900, 'Banco de Bogotá', 'BDB-260921184112-39900']);
 });
 
-test('parsearSMS despacha correctamente: Banco de Bogotá', () => {
-  const texto = 'Banco de Bogota: Tu compra por 1,000 fue aprobada con Tarjeta Crédito 1234 el 05/05/26 10:00:00 en NETFLIX.COM ¿Dudas? Llama a la Servilinea';
-  const r = parsearSMS(texto);
-  assert.equal(r.tipo, 'Compra tarjeta');
-  assert.equal(r.descripcion, 'NETFLIX.COM');
+test('doPost · un SMS no reconocido no escribe nada', () => {
+  const { ctx, hoja } = cargarScript();
+  const r = post(ctx, { texto: 'Bancolombia: Tu clave dinamica es 123456.' });
+  assert.equal(r.ok, false);
+  assert.equal(hoja.filas.length, 1);
 });
 
-test('SMS no reconocido cae al parser genérico sin perder el monto', () => {
-  const texto = 'Tu banco favorito te informa un cargo de $45,500 en un comercio nuevo.';
-  const r = parsearSMS(texto);
-  assert.equal(r.tipo, 'Desconocido');
-  assert.equal(r.monto, '45500');
+test('doPost · sigue aceptando campos ya separados (flujo anterior)', () => {
+  const { ctx, hoja } = cargarScript();
+  const r = post(ctx, { fecha: '2026-09-22', descripción: 'PRUEBA iPhone', monto: 1, fuente: 'PRUEBA', id: 'IPHONE-TEST-001' });
+  assert.equal(r.ok, true);
+  assert.equal(hoja.filas[1][1], 'PRUEBA iPhone');
 });
 
-test('SMS totalmente irreconocible no revienta y devuelve monto 0', () => {
-  const texto = 'Este mensaje no tiene ningún monto ni fecha reconocible.';
-  const r = parsearSMS(texto);
-  assert.equal(r.tipo, 'Desconocido');
-  assert.equal(r.monto, '0');
+test('doGet · sin parámetros responde el chequeo de salud', () => {
+  const { ctx } = cargarScript();
+  assert.equal(respuesta(ctx.doGet({ parameter: {} })).ok, true);
 });
 
-test('parseTransferenciaBreB devuelve null si el texto no calza', () => {
-  assert.equal(parseTransferenciaBreB('mensaje cualquiera sin el patrón esperado'), null);
+test('doGet · movimientos requiere la clave de lectura', () => {
+  const { ctx } = cargarScript();
+  assert.equal(respuesta(ctx.doGet({ parameter: { accion: 'movimientos', clave: 'otra' } })).ok, false);
+  assert.equal(respuesta(ctx.doGet({ parameter: { accion: 'movimientos' } })).ok, false);
 });
 
-test('parseCompraBancoBogota devuelve null si el texto no calza', () => {
-  assert.equal(parseCompraBancoBogota('mensaje cualquiera sin el patrón esperado'), null);
+test('doGet · sin CLAVE_LECTURA configurada no entrega datos', () => {
+  const { ctx } = cargarScript({ claveLectura: null });
+  assert.equal(respuesta(ctx.doGet({ parameter: { accion: 'movimientos', clave: '' } })).ok, false);
 });
 
-// Plantilla para cuando agregues un banco nuevo: duplica este bloque,
-// cambia el texto de ejemplo y los valores esperados.
-//
-// test('Nuevo banco · descripción del mensaje', () => {
-//   const texto = '...';
-//   const r = parseNuevoBanco(texto);
-//   assert.ok(r);
-//   assert.equal(r.fecha, 'YYYY-MM-DD');
-//   assert.equal(r.monto, '...');
-//   assert.equal(r.descripcion, '...');
-//   assert.equal(r.tipo, '...');
-// });
+test('doGet · devuelve las filas, con fechas tipo Date convertidas a dd/mm/aaaa', () => {
+  const hoja = crearHoja([
+    ['Fecha', 'Descripción', 'Monto', 'Fuente', 'ID'],
+    [new Date(2026, 8, 22), 'PRUEBA iPhone', 1, 'PRUEBA', 'IPHONE-TEST-001'],
+    ['21/09/2026', 'Rappi', 39900, 'Banco de Bogotá', 'BDB-260921184112-39900'],
+    ['', '', '', '', ''],
+  ]);
+  const { ctx } = cargarScript({ hoja });
+  const r = respuesta(ctx.doGet({ parameter: { accion: 'movimientos', clave: 'secreta' } }));
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.movimientos, [
+    { fecha: '22/09/2026', descripcion: 'PRUEBA iPhone', monto: 1, fuente: 'PRUEBA', id: 'IPHONE-TEST-001' },
+    { fecha: '21/09/2026', descripcion: 'Rappi', monto: 39900, fuente: 'Banco de Bogotá', id: 'BDB-260921184112-39900' },
+  ]);
+});

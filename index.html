@@ -128,7 +128,7 @@
 <div class="wrap">
 
   <h1>Tu presupuesto</h1>
-  <p class="sub" id="month-label">Septiembre 2026 · día 13 de 30</p>
+  <p class="sub" id="month-label">Septiembre 2026</p>
 
   <div class="hero">
     <p class="hero-label">Balance del mes hasta hoy</p>
@@ -176,28 +176,25 @@
   <section>
     <div class="sec-head">
       <h2>Movimientos del Sheet</h2>
-      <span class="sec-note">se leen directo de Google Sheets</span>
+      <span class="sec-note">los SMS que tus Atajos ya registraron</span>
     </div>
-    <p class="hint">Trae los SMS que tu Atajo ya guardó en el Google Sheet — sin copiar y pegar nada. Necesitas configurar una sola vez el Spreadsheet ID y una API key de Google (ver detalles abajo). La app recuerda cómo clasificaste cada descripción y cada monto exacto (ej. tu arriendo), y te sugiere la misma categoría la próxima vez.</p>
+    <p class="hint">Trae los movimientos del Google Sheet que todavía no has agregado. Te sugiere la categoría de cada uno según cómo clasificaste antes esa misma descripción o ese mismo monto (ej. tu arriendo). El ahorro y los pagos a tu tarjeta de Banco de Bogotá vienen marcados para ignorar, porque no son gastos nuevos.</p>
     <div class="form-card">
       <div class="form-row" style="align-items:center;">
         <button onclick="syncFromSheet()" id="sync-btn">Sincronizar desde el Sheet</button>
         <span class="sync-status" id="sync-status"></span>
       </div>
       <details class="settings" id="sync-settings">
-        <summary>Configuración de conexión con Google Sheets</summary>
+        <summary>Conexión con tu Apps Script</summary>
         <div class="form-card" style="margin-top:10px;">
           <div class="form-row">
-            <input type="text" id="cfg-spreadsheet-id" placeholder="Spreadsheet ID (de la URL del Sheet)">
+            <input type="url" id="cfg-webapp-url" placeholder="URL del Web App (termina en /exec)" autocomplete="off">
           </div>
           <div class="form-row">
-            <input type="text" id="cfg-sheet-name" placeholder="Nombre de la pestaña (ej: Movimientos)">
+            <input type="password" id="cfg-clave" placeholder="Clave de lectura (CLAVE_LECTURA)" autocomplete="off">
           </div>
-          <div class="form-row">
-            <input type="text" id="cfg-api-key" placeholder="API key de Google Cloud">
-          </div>
-          <p class="hint">La API key y el Spreadsheet ID se guardan solo en este dispositivo (nunca en el código fuente). Ver docs/SETUP.md para cómo conseguirlos.</p>
-          <button onclick="saveSyncConfig()">Guardar configuración</button>
+          <p class="hint">Se guardan solo en este dispositivo, nunca en el código. La clave es la misma que pusiste en las propiedades del Apps Script.</p>
+          <button onclick="saveSyncConfig()">Guardar conexión</button>
         </div>
       </details>
     </div>
@@ -215,7 +212,7 @@
     </div>
     <div class="import-preview" id="import-preview"></div>
     <div id="import-confirm" style="display:none; margin-top:10px;">
-      <button onclick="confirmImport()">Agregar estos gastos</button>
+      <button onclick="confirmImport()">Confirmar</button>
       <button class="secondary" onclick="cancelImport()" style="margin-left:8px;">Cancelar</button>
     </div>
   </section>
@@ -242,9 +239,59 @@
 </div>
 
 <script>
+// window.storage solo existe dentro de claude.ai. En GitHub Pages se usa el
+// localStorage del navegador con la misma interfaz; sin esto la app no
+// guardaba nada y arrancaba de cero en cada visita.
+if(!window.storage){
+  window.storage = {
+    async get(key){
+      const value = localStorage.getItem(key);
+      if(value === null) throw new Error('Sin datos guardados para ' + key);
+      return { key, value };
+    },
+    async set(key, value){
+      localStorage.setItem(key, value);
+      return { key, value };
+    },
+  };
+}
+
 const MONTH_KEY = 'presupuesto-2026-09';
+const MONTH = MONTH_KEY.slice(-7);
 const SYNC_CONFIG_KEY = 'presupuesto-sync-config';
 const LEARNED_CATEGORIES_KEY = 'presupuesto-categorias-aprendidas';
+
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+// Categorías especiales del selector de importación (no son de BUDGET).
+const CAT_INGRESO = '__ingreso';
+const CAT_IGNORAR = '__ignorar';
+
+const METODO_POR_FUENTE = {
+  'Banco de Bogotá': 'Tarjeta Banco de Bogotá',
+  'Bancolombia': 'Débito Bancolombia',
+};
+
+// Fecha local (Colombia), no UTC: toISOString() daba el día siguiente
+// después de las 7pm.
+function hoyISO(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
+function renderMonthLabel(){
+  const [y, m] = MONTH.split('-').map(Number);
+  const hoy = new Date();
+  let texto = `${MESES[m-1]} ${y}`;
+  if(hoy.getFullYear() === y && hoy.getMonth() + 1 === m){
+    texto += ` · día ${hoy.getDate()} de ${new Date(y, m, 0).getDate()}`;
+  }
+  document.getElementById('month-label').textContent = texto;
+}
 
 const BUDGET = [
   { key: 'uber', name: 'Uber', budget: 415915 },
@@ -332,12 +379,14 @@ const EXPENSES_DEFAULT = {
   gimnasio: [], materiales: [], suplementos: [], tinte: [], psicologia: [], arriendo: [],
 };
 
-let state = { expenses: {}, specials: [], income: [] };
+// importedIds: IDs del Sheet ya importados a este mes. Viven en el estado
+// del mes, así "reiniciar el mes" permite volver a traerlos.
+let state = { expenses: {}, specials: [], income: [], importedIds: [] };
 let pendingImport = [];
 let pendingImportOrigin = null; // 'manual' | 'sheet'
-let pendingImportUpToRow = null; // última fila del Sheet incluida en pendingImport
 
-let syncConfig = { spreadsheetId: '', sheetName: 'Movimientos', apiKey: '', lastImportedRow: 1 };
+const syncDefaults = () => ({ webAppUrl: '', clave: '' });
+let syncConfig = syncDefaults();
 
 // Memoria de categorización: qué categoría le pusiste la última vez a
 // una descripción exacta, y qué categoría le pusiste la última vez a
@@ -347,7 +396,7 @@ let syncConfig = { spreadsheetId: '', sheetName: 'Movimientos', apiKey: '', last
 let learned = { byDesc: {}, byAmount: {} };
 
 function freshDefaults(){
-  return { expenses: JSON.parse(JSON.stringify(EXPENSES_DEFAULT)), specials: [...SPECIALS_DEFAULT], income: [...INCOME_DEFAULT] };
+  return { expenses: JSON.parse(JSON.stringify(EXPENSES_DEFAULT)), specials: [...SPECIALS_DEFAULT], income: [...INCOME_DEFAULT], importedIds: [] };
 }
 
 function normalize(s){
@@ -360,6 +409,7 @@ function normalize(s){
   });
   if(!Array.isArray(s.specials)) s.specials = [...SPECIALS_DEFAULT];
   if(!Array.isArray(s.income)) s.income = [...INCOME_DEFAULT];
+  if(!Array.isArray(s.importedIds)) s.importedIds = [];
   return s;
 }
 
@@ -386,23 +436,23 @@ async function saveState(){
   try{ await window.storage.set(MONTH_KEY, JSON.stringify(state)); }catch(e){ console.error('storage error', e); }
 }
 
-// ---------- Configuración de sincronización con Google Sheets ----------
-// Se guarda aparte del estado del mes: la config y el progreso de
-// sincronización (lastImportedRow) sobreviven a "reiniciar el mes",
-// porque el Sheet sigue creciendo aunque cambies de mes en la app.
+// ---------- Conexión con el Apps Script ----------
+// Se guarda aparte del estado del mes, solo en este dispositivo.
 
 async function loadSyncConfig(){
   try{
     const r = await window.storage.get(SYNC_CONFIG_KEY);
     const parsed = JSON.parse(r.value);
-    syncConfig = Object.assign({ spreadsheetId: '', sheetName: 'Movimientos', apiKey: '', lastImportedRow: 1 }, parsed);
+    syncConfig = {
+      webAppUrl: typeof parsed.webAppUrl === 'string' ? parsed.webAppUrl : '',
+      clave: typeof parsed.clave === 'string' ? parsed.clave : '',
+    };
   }catch(e){
-    // sin configuración guardada todavía — se quedan los valores por defecto
+    syncConfig = syncDefaults();
   }
-  document.getElementById('cfg-spreadsheet-id').value = syncConfig.spreadsheetId || '';
-  document.getElementById('cfg-sheet-name').value = syncConfig.sheetName || 'Movimientos';
-  document.getElementById('cfg-api-key').value = syncConfig.apiKey || '';
-  if(!syncConfig.spreadsheetId || !syncConfig.apiKey){
+  document.getElementById('cfg-webapp-url').value = syncConfig.webAppUrl;
+  document.getElementById('cfg-clave').value = syncConfig.clave;
+  if(!syncConfig.webAppUrl || !syncConfig.clave){
     document.getElementById('sync-settings').open = true;
   }
 }
@@ -411,12 +461,17 @@ async function saveSyncConfigToStorage(){
   try{ await window.storage.set(SYNC_CONFIG_KEY, JSON.stringify(syncConfig)); }catch(e){ console.error('storage error', e); }
 }
 
-function saveSyncConfig(){
-  syncConfig.spreadsheetId = document.getElementById('cfg-spreadsheet-id').value.trim();
-  syncConfig.sheetName = document.getElementById('cfg-sheet-name').value.trim() || 'Movimientos';
-  syncConfig.apiKey = document.getElementById('cfg-api-key').value.trim();
-  saveSyncConfigToStorage();
-  setSyncStatus('Configuración guardada.', false);
+async function saveSyncConfig(){
+  const url = document.getElementById('cfg-webapp-url').value.trim();
+  if(url && !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(url)){
+    setSyncStatus('La URL debe ser la del Web App: https://script.google.com/macros/s/…/exec', true);
+    return;
+  }
+  syncConfig.webAppUrl = url;
+  syncConfig.clave = document.getElementById('cfg-clave').value.trim();
+  await saveSyncConfigToStorage();
+  setSyncStatus('Conexión guardada.', false);
+  document.getElementById('sync-settings').open = false;
 }
 
 function setSyncStatus(msg, isError){
@@ -479,58 +534,62 @@ function categorize(desc, amount){
   return { category: 'materiales', source: 'default' };
 }
 
-function guessCategory(desc, amount){
-  return categorize(desc, amount).category;
-}
-
 function learnFromConfirmed(desc, amount, category){
   const descKey = normalizeDesc(desc);
   if(descKey) learned.byDesc[descKey] = category;
   if(amount) learned.byAmount[amountKey(amount)] = category;
 }
 
-// Trae de la Sheets API v4 las filas nuevas desde `sinceRow` (1-indexed,
-// fila de encabezado = 1) hasta el final de la pestaña. Requiere que el
-// Sheet esté compartido como "Cualquiera con el enlace puede ver" y que
-// la API key tenga habilitada la Google Sheets API (ver docs/SETUP.md).
-async function fetchSheetRows(sinceRow){
-  const range = encodeURIComponent(`${syncConfig.sheetName}!A${sinceRow + 1}:E`);
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${syncConfig.spreadsheetId}/values/${range}?key=${syncConfig.apiKey}`;
-  const res = await fetch(url);
-  if(!res.ok){
-    let msg = `HTTP ${res.status}`;
-    try{
-      const body = await res.json();
-      if(body && body.error && body.error.message) msg = body.error.message;
-    }catch(e){ /* la respuesta no era JSON, se usa el status */ }
-    throw new Error(msg);
+// El Apps Script expone los movimientos con ?accion=movimientos&clave=...
+// Es un GET simple (sin headers propios) para que el navegador no haga
+// preflight de CORS, que Apps Script no soporta.
+async function fetchMovimientos(){
+  const url = `${syncConfig.webAppUrl}?accion=movimientos&clave=${encodeURIComponent(syncConfig.clave)}`;
+  let res;
+  try{
+    res = await fetch(url);
+  }catch(e){
+    throw new Error('no se pudo conectar. Revisa la URL y que el Web App tenga acceso para "Cualquier usuario".');
   }
-  const data = await res.json();
-  return data.values || [];
+  if(!res.ok) throw new Error(`el Apps Script respondió HTTP ${res.status}`);
+  let data;
+  try{
+    data = await res.json();
+  }catch(e){
+    throw new Error('la URL no devolvió datos. ¿Es la del Web App y está desplegada la versión nueva?');
+  }
+  if(!data.ok) throw new Error(data.error || 'respuesta inesperada del Apps Script');
+  return Array.isArray(data.movimientos) ? data.movimientos : [];
 }
 
-function rowsToPending(rows, startRow){
-  return rows.map((r, i) => {
-    const fecha = r[0] || '';
-    const descripcion = r[1] || '';
-    const montoRaw = r[2] || '0';
-    const amount = Math.abs(parseFloat(String(montoRaw).replace(/,/g, '')) || 0);
-    const finalDesc = descripcion || '(sin descripción)';
-    const guess = categorize(finalDesc, amount);
-    return {
-      desc: finalDesc,
-      amount,
-      date: fecha || new Date().toISOString().slice(0,10),
-      category: guess.category,
-      categorySource: guess.source,
-      sheetRow: startRow + i,
-    };
-  }).filter(t => t.amount > 0);
+// El Apps Script marca el tipo de SMS en el prefijo del ID.
+function tipoMovimiento(m){
+  if(m.id.startsWith('BCOLAHO-')) return 'ahorro';
+  if(m.id.startsWith('BCOLREC-')) return 'ingreso';
+  // Las compras con la tarjeta de Banco de Bogotá ya llegan una por una;
+  // sumar también el pago de la tarjeta las contaría dos veces.
+  if(m.id.startsWith('BCOLPAG-') && /banco de bogot/i.test(m.descripcion)) return 'pagoTarjeta';
+  return 'gasto';
+}
+
+function movimientoToPending(m){
+  const base = {
+    id: m.id,
+    desc: m.descripcion || '(sin descripción)',
+    amount: Math.abs(Number(m.monto) || 0),
+    date: normalizeDate(m.fecha),
+    method: METODO_POR_FUENTE[m.fuente] || m.fuente,
+  };
+  const tipo = tipoMovimiento(m);
+  if(tipo === 'ingreso') return { ...base, category: CAT_INGRESO, categorySource: 'ingreso' };
+  if(tipo !== 'gasto') return { ...base, category: CAT_IGNORAR, categorySource: tipo };
+  const guess = categorize(base.desc, base.amount);
+  return { ...base, category: guess.category, categorySource: guess.source };
 }
 
 async function syncFromSheet(){
-  if(!syncConfig.spreadsheetId || !syncConfig.apiKey){
-    setSyncStatus('Falta configurar el Spreadsheet ID y la API key (abre "Configuración" abajo).', true);
+  if(!syncConfig.webAppUrl || !syncConfig.clave){
+    setSyncStatus('Falta configurar la conexión (abre "Conexión con tu Apps Script").', true);
     document.getElementById('sync-settings').open = true;
     return;
   }
@@ -538,23 +597,25 @@ async function syncFromSheet(){
   btn.disabled = true;
   setSyncStatus('Sincronizando…', false);
   try{
-    const sinceRow = syncConfig.lastImportedRow || 1;
-    const rows = await fetchSheetRows(sinceRow);
-    if(rows.length === 0){
-      setSyncStatus('No hay movimientos nuevos en el Sheet.', false);
-      return;
-    }
-    pendingImport = rowsToPending(rows, sinceRow + 1);
+    const movimientos = await fetchMovimientos();
+    const yaImportados = new Set(state.importedIds);
+    const nuevos = movimientos.filter(m => m.id && !yaImportados.has(m.id) && m.fuente !== 'PRUEBA');
+    // La app lleva un mes a la vez: lo de otros meses no debe sumar aquí.
+    const delMes = nuevos.filter(m => normalizeDate(m.fecha).startsWith(MONTH));
+    const deOtrosMeses = nuevos.length - delMes.length;
+    pendingImport = delMes.map(movimientoToPending).filter(t => t.amount > 0);
     pendingImportOrigin = 'sheet';
-    pendingImportUpToRow = sinceRow + rows.length;
+    const notaOtrosMeses = deOtrosMeses ? ` (${deOtrosMeses} de otros meses no se incluyen)` : '';
     if(pendingImport.length === 0){
-      setSyncStatus('Las filas nuevas no tenían un monto reconocible.', true);
+      setSyncStatus('No hay movimientos nuevos de este mes' + notaOtrosMeses + '.', false);
+      cancelImport();
       return;
     }
     renderImportPreview();
-    setSyncStatus(`${pendingImport.length} movimiento(s) nuevo(s) — revisa las categorías abajo y confirma.`, false);
+    setSyncStatus(`${pendingImport.length} movimiento(s) nuevo(s)${notaOtrosMeses}: revisa las categorías abajo y confirma.`, false);
   }catch(err){
     setSyncStatus('Error al sincronizar: ' + err.message, true);
+    document.getElementById('sync-settings').open = true;
   }finally{
     btn.disabled = false;
   }
@@ -571,7 +632,7 @@ function catTotal(key){
 function addExpense(){
   const cat = document.getElementById('add-cat').value;
   const val = parseFloat(document.getElementById('add-amt').value);
-  const date = document.getElementById('add-date').value || new Date().toISOString().slice(0,10);
+  const date = document.getElementById('add-date').value || hoyISO();
   const method = document.getElementById('add-method').value;
   if(!val || val <= 0) return;
   if(!state.expenses[cat]) state.expenses[cat] = [];
@@ -602,17 +663,17 @@ function parseImport(){
     return {
       desc: finalDesc,
       amount: finalAmount,
-      date: dateMatch ? normalizeDate(dateMatch[0]) : new Date().toISOString().slice(0,10),
+      date: dateMatch ? normalizeDate(dateMatch[0]) : hoyISO(),
       category: guess.category,
       categorySource: guess.source,
     };
   }).filter(t => t.amount > 0);
   pendingImportOrigin = 'manual';
-  pendingImportUpToRow = null;
   renderImportPreview();
 }
 
 function normalizeDate(d){
+  d = String(d || '');
   if(d.includes('-')) return d;
   const parts = d.split('/');
   if(parts.length === 3){
@@ -620,7 +681,7 @@ function normalizeDate(d){
     if(y.length === 2) y = '20' + y;
     return `${y}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`;
   }
-  return new Date().toISOString().slice(0,10);
+  return hoyISO();
 }
 
 function renderImportPreview(){
@@ -631,12 +692,17 @@ function renderImportPreview(){
     confirmBox.style.display = 'none';
     return;
   }
-  const sourceLabel = { desc: 'recordada', amount: 'por monto' };
+  const sourceLabel = { desc: 'recordada', amount: 'por monto', ingreso: 'ingreso', ahorro: 'ahorro', pagoTarjeta: 'pago de tarjeta' };
+  const opciones = [
+    ...BUDGET.map(c => ({ value: c.key, name: c.name })),
+    { value: CAT_INGRESO, name: 'Ingreso (no es gasto)' },
+    { value: CAT_IGNORAR, name: 'Ignorar (no sumar)' },
+  ];
   box.innerHTML = pendingImport.map((t,i) => `
     <div class="import-row">
-      <span class="desc">${t.desc}${sourceLabel[t.categorySource] ? ` <span class="tag ok">${sourceLabel[t.categorySource]}</span>` : ''}</span>
+      <span class="desc">${escapeHtml(t.desc)}${sourceLabel[t.categorySource] ? ` <span class="tag ok">${sourceLabel[t.categorySource]}</span>` : ''}</span>
       <select onchange="pendingImport[${i}].category=this.value; pendingImport[${i}].categorySource='manual'">
-        ${BUDGET.map(c => `<option value="${c.key}" ${c.key===t.category?'selected':''}>${c.name}</option>`).join('')}
+        ${opciones.map(o => `<option value="${o.value}" ${o.value===t.category?'selected':''}>${o.name}</option>`).join('')}
       </select>
       <span class="amt">${money(t.amount)}</span>
     </div>
@@ -645,24 +711,30 @@ function renderImportPreview(){
 }
 
 function confirmImport(){
-  const method = pendingImportOrigin === 'sheet' ? 'SMS (Sheet)' : 'Importado';
+  const metodoPorDefecto = pendingImportOrigin === 'sheet' ? 'SMS (Sheet)' : 'Importado';
+  let gastos = 0, ingresos = 0, ignorados = 0;
   pendingImport.forEach(t => {
-    if(!state.expenses[t.category]) state.expenses[t.category] = [];
-    state.expenses[t.category].push({ amount: t.amount, date: t.date, method, desc: t.desc });
-    learnFromConfirmed(t.desc, t.amount, t.category);
+    if(t.category === CAT_IGNORAR){
+      ignorados++;
+    }else if(t.category === CAT_INGRESO){
+      state.income.push({ name: t.desc, amount: t.amount });
+      ingresos++;
+    }else{
+      if(!state.expenses[t.category]) state.expenses[t.category] = [];
+      state.expenses[t.category].push({ amount: t.amount, date: t.date, method: t.method || metodoPorDefecto, desc: t.desc });
+      // Solo se aprende de gastos: aprender "ignorar" por monto haría que
+      // cualquier gasto futuro del mismo valor saliera ignorado.
+      learnFromConfirmed(t.desc, t.amount, t.category);
+      gastos++;
+    }
   });
   saveLearnedCategories();
-  if(pendingImportOrigin === 'sheet' && pendingImportUpToRow){
-    syncConfig.lastImportedRow = pendingImportUpToRow;
-    saveSyncConfigToStorage();
-    setSyncStatus('Movimientos agregados. El Sheet queda al día.', false);
+  if(pendingImportOrigin === 'sheet'){
+    state.importedIds.push(...pendingImport.map(t => t.id));
+    setSyncStatus(`Listo: ${gastos} gasto(s), ${ingresos} ingreso(s) y ${ignorados} ignorado(s).`, false);
   }
-  pendingImport = [];
-  pendingImportOrigin = null;
-  pendingImportUpToRow = null;
   document.getElementById('import-text').value = '';
-  document.getElementById('import-preview').innerHTML = '';
-  document.getElementById('import-confirm').style.display = 'none';
+  cancelImport();
   saveState();
   render();
 }
@@ -670,7 +742,6 @@ function confirmImport(){
 function cancelImport(){
   pendingImport = [];
   pendingImportOrigin = null;
-  pendingImportUpToRow = null;
   document.getElementById('import-preview').innerHTML = '';
   document.getElementById('import-confirm').style.display = 'none';
 }
@@ -683,10 +754,13 @@ async function resetMonth(){
 
 let chart;
 function render(){
+  renderMonthLabel();
   const select = document.getElementById('add-cat');
+  const categoriaElegida = select.value;
   select.innerHTML = BUDGET.map(c => `<option value="${c.key}">${c.name}</option>`).join('');
+  if(categoriaElegida) select.value = categoriaElegida;
   if(!document.getElementById('add-date').value){
-    document.getElementById('add-date').value = new Date().toISOString().slice(0,10);
+    document.getElementById('add-date').value = hoyISO();
   }
 
   const catList = document.getElementById('cat-list');
@@ -716,13 +790,13 @@ function render(){
 
   const specialList = document.getElementById('special-list');
   specialList.innerHTML = state.specials.map(s => `
-    <div class="special-item"><span class="name">${s.name}</span><span class="amt">${money(s.amount)}</span></div>
+    <div class="special-item"><span class="name">${escapeHtml(s.name)}</span><span class="amt">${money(s.amount)}</span></div>
   `).join('');
   const totalEspeciales = state.specials.reduce((a,s) => a + s.amount, 0);
 
   const incomeList = document.getElementById('income-list');
   incomeList.innerHTML = state.income.map(i => `
-    <div class="income-item"><span class="name">${i.name}</span><span class="amt">${money(i.amount)}</span></div>
+    <div class="income-item"><span class="name">${escapeHtml(i.name)}</span><span class="amt">${money(i.amount)}</span></div>
   `).join('');
   const totalIngresos = state.income.reduce((a,i) => a + i.amount, 0);
 
