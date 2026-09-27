@@ -308,31 +308,30 @@ function renderMonthLabel(){
   document.getElementById('month-label').textContent = texto;
 }
 
-// Presupuesto mensual del Excel Finanzas_Anamaria: promedios de la hoja
-// Costo_Vida y, para los "destinados", el tope de la hoja Destinados.
+// Topes mensuales que Ana María definió para la app. Administración,
+// Deudas, Splitwise y Salidas vienen del Excel Finanzas_Anamaria.
 const BUDGET = [
+  { key: 'uber', name: 'Uber', budget: 415915 },
+  { key: 'mercado', name: 'Mercado', budget: 550000 },
+  { key: 'salud', name: 'Salud', budget: 94000 },
+  { key: 'suscripciones', name: 'Suscripciones', budget: 200000 },
+  { key: 'domicilios', name: 'Domicilios', budget: 200000 },
+  { key: 'peluqueria', name: 'Peluquería', budget: 85400 },
+  { key: 'telco', name: 'Telco (factura completa)', budget: 147800 },
+  { key: 'gimnasio', name: 'Gimnasio', budget: 70250 },
+  { key: 'materiales', name: 'Gastos materiales', budget: 150000 },
+  { key: 'suplementos', name: 'Suplementos', budget: 143333 },
+  { key: 'tinte', name: 'Tinte de pelo', budget: 83333 },
+  { key: 'psicologia', name: 'Psicología', budget: 510000 },
   { key: 'arriendo', name: 'Arriendo', budget: 1020000 },
   { key: 'administracion', name: 'Administración', budget: 286600 },
   { key: 'deudas', name: 'Deudas (cuotas mamá)', budget: 327000 },
   { key: 'splitwise', name: 'Splitwise (hogar compartido)', budget: 382865 },
-  { key: 'uber', name: 'Transporte (Uber)', budget: 500000 },
-  { key: 'mercado', name: 'Mercado (súper)', budget: 370496 },
-  { key: 'domicilios', name: 'Domicilios / restaurantes', budget: 126408 },
-  { key: 'suscripciones', name: 'Suscripciones', budget: 209776 },
-  { key: 'salud', name: 'Salud / farmacia', budget: 209295 },
-  { key: 'peluqueria', name: 'Peluquería', budget: 150000 },
-  { key: 'gimnasio', name: 'Gimnasio', budget: 160000 },
-  { key: 'psicologia', name: 'Psicología', budget: 425000 },
-  { key: 'materiales', name: 'Gastos materiales', budget: 150000 },
-  { key: 'telco', name: 'Telco (celular propio)', budget: 60000 },
   { key: 'salidas', name: 'Salidas sociales y planes', budget: 350000 },
 ];
 
 // Hoja Ingresos del Excel: salario, mesadas y sobrante de Lausana.
 const INGRESO_ESPERADO = 4050000;
-
-// Categorías que existían antes y ya no están en el Excel.
-const CATEGORIAS_ANTERIORES = { suplementos: 'salud', tinte: 'peluqueria' };
 
 // Palabras clave para auto-categorizar movimientos importados
 const KEYWORDS = {
@@ -414,7 +413,7 @@ const EXPENSES_DEFAULT = {
   telco: [
     {amount:147800, date:'2026-09-01', method:'Débito Bancolombia', desc:'UNE Telco (factura completa)'},
   ],
-  gimnasio: [], materiales: [], psicologia: [], arriendo: [],
+  gimnasio: [], materiales: [], suplementos: [], tinte: [], psicologia: [], arriendo: [],
   administracion: [], deudas: [], splitwise: [], salidas: [],
 };
 
@@ -441,12 +440,6 @@ function freshDefaults(){
 function normalize(s){
   if(!s || typeof s !== 'object') return freshDefaults();
   if(!s.expenses || typeof s.expenses !== 'object') s.expenses = {};
-  for(const [vieja, nueva] of Object.entries(CATEGORIAS_ANTERIORES)){
-    if(Array.isArray(s.expenses[vieja])){
-      s.expenses[nueva] = (s.expenses[nueva] || []).concat(s.expenses[vieja]);
-    }
-    delete s.expenses[vieja];
-  }
   BUDGET.forEach(c => {
     if(!Array.isArray(s.expenses[c.key])){
       s.expenses[c.key] = EXPENSES_DEFAULT[c.key] ? JSON.parse(JSON.stringify(EXPENSES_DEFAULT[c.key])) : [];
@@ -556,8 +549,7 @@ function amountKey(amount){
 }
 
 function categoriaVigente(key){
-  const k = CATEGORIAS_ANTERIORES[key] || key;
-  return BUDGET.some(c => c.key === k) ? k : null;
+  return BUDGET.some(c => c.key === key) ? key : null;
 }
 
 // Sugiere una categoría en orden de confianza:
