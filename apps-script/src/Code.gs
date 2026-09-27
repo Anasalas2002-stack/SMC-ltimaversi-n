@@ -34,9 +34,7 @@ function listarMovimientos(clave) {
     .getValues()
     .filter(fila => fila.some(celda => celda !== ''))
     .map(([fecha, descripcion, monto, fuente, id]) => ({
-      fecha: Object.prototype.toString.call(fecha) === '[object Date]'
-        ? Utilities.formatDate(fecha, tz, 'dd/MM/yyyy')
-        : String(fecha),
+      fecha: fechaTexto(fecha, tz),
       descripcion: String(descripcion),
       monto: Number(monto),
       fuente: String(fuente),
@@ -103,7 +101,7 @@ function doPost(e) {
     try {
       const sheet = getSheet();
 
-      if (id && movimientoExiste(sheet, id)) {
+      if (id && movimientoExiste(sheet, { id, fecha, monto, fuente })) {
         return jsonResponse({
           ok: true,
           duplicate: true,
@@ -324,12 +322,32 @@ function agregarFila(sheet, fila) {
   sheet.getRange(row, 1, 1, fila.length).setValues([fila]);
 }
 
-function movimientoExiste(sheet, id) {
-  if (!id) return false;
+// Además del mismo ID, cuenta como repetido un movimiento que ya se cargó
+// desde un extracto (ID "EXT-…") con la misma fecha, monto y banco: si no,
+// el barrido de SMS volvería a agregar las compras de los últimos días.
+function movimientoExiste(sheet, mov) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return false;
-  const ids = sheet.getRange(2, 5, lastRow - 1, 1).getValues();
-  return ids.some(row => String(row[0]) === id);
+  const tz = Session.getScriptTimeZone();
+  const fecha = fechaTexto(mov.fecha, tz);
+  return sheet.getRange(2, 1, lastRow - 1, 5).getValues().some(([f, , monto, fuente, id]) => {
+    if (String(id) === mov.id) return true;
+    return String(id).startsWith('EXT-') &&
+      fuente === mov.fuente &&
+      Number(monto) === Number(mov.monto) &&
+      fechaTexto(f, tz) === fecha;
+  });
+}
+
+// Fechas del Sheet a "dd/mm/aaaa": pueden ser texto dd/mm/aaaa, texto
+// aaaa-mm-dd (filas pegadas a mano) o fechas que Sheets ya convirtió.
+function fechaTexto(valor, tz) {
+  if (Object.prototype.toString.call(valor) === '[object Date]') {
+    return Utilities.formatDate(valor, tz, 'dd/MM/yyyy');
+  }
+  const s = String(valor);
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return iso ? `${iso[3]}/${iso[2]}/${iso[1]}` : s;
 }
 
 function jsonResponse(data) {

@@ -97,6 +97,20 @@ test('doPost · registra un SMS y descarta el mismo SMS la segunda vez', () => {
   assert.deepEqual(hoja.filas[1], ['21/09/2026', 'Rappi', 39900, 'Banco de Bogotá', 'BDB-260921184112-39900']);
 });
 
+test('doPost · un SMS de una compra que ya se cargó del extracto no se duplica', () => {
+  const hoja = crearHoja([
+    ['Fecha', 'Descripción', 'Monto', 'Fuente', 'ID'],
+    [new Date(2026, 8, 26), 'TIENDA D1 CHAPINERO AL', 107630, 'Banco de Bogotá', 'EXT-BDB-20260926-107630'],
+    ['2026-09-24', 'Rappi', 11500, 'Banco de Bogotá', 'EXT-BDB-20260924-11500'],
+  ]);
+  const { ctx } = cargarScript({ hoja });
+  const sms = (monto, dia) => `Banco de Bogota: Tu compra por ${monto} fue aprobada con Tarjeta Crédito 6359 el ${dia}/09/26 12:00:00 en TIENDA D1 ¿Dudas? Llama a la Servilinea`;
+  assert.equal(post(ctx, { texto: sms('107,630', '26') }).duplicate, true, 'fecha tipo Date');
+  assert.equal(post(ctx, { texto: sms('11,500', '24') }).duplicate, true, 'fecha pegada como aaaa-mm-dd');
+  assert.equal(post(ctx, { texto: sms('20,000', '26') }).message, 'Movimiento registrado.', 'otro monto el mismo día sí entra');
+  assert.equal(hoja.filas.length, 4);
+});
+
 test('doPost · un SMS no reconocido no escribe nada', () => {
   const { ctx, hoja } = cargarScript();
   const r = post(ctx, { texto: 'Bancolombia: Tu clave dinamica es 123456.' });
