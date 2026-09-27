@@ -207,7 +207,7 @@ function parseBancolombiaPagoProducto(texto) {
 //  desde tu cuenta *3335 a JUAN RIANO el 18/09/26 a las 17:44..."
 function parseBancolombiaTransferenciaEnviada(texto) {
   const monto = texto.match(/transferiste\s*\$\s*([\d,]+\.\d{2})/i);
-  const destinatario = texto.match(/a la llave\s*@[\w.]+\s*desde tu cuenta\s*\*?\d+\s*a\s+(.+?)\s+el\s+\d{2}\/\d{2}\/\d{2}/i);
+  const destinatario = texto.match(/a la llave\s*@?[\w.]+\s*desde tu cuenta\s*\*?\d+\s*a\s+(.+?)\s+el\s+\d{2}\/\d{2}\/\d{2}/i);
   const fechaHora = texto.match(/el\s+(\d{2})\/(\d{2})\/(\d{2})\s+a las\s+(\d{2}):(\d{2})/i);
   if (!monto || !fechaHora) return null;
   const montoNumero = Number(monto[1].replace(/,/g, ''));
