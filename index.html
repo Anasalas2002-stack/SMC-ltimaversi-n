@@ -107,12 +107,24 @@
   .income-item .amt{font-weight:600; color:#8A5A00; font-variant-numeric:tabular-nums; font-size:14px;}
   .import-preview{margin-top:12px; display:flex; flex-direction:column; gap:6px;}
   .import-row{
-    display:flex; justify-content:space-between; align-items:center; gap:8px;
-    background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12.5px;
+    display:flex; flex-direction:column; gap:6px;
+    background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:13px;
   }
-  .import-row select{width:150px; padding:5px 6px; font-size:12px;}
-  .import-row .desc{flex:1; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .import-row .amt{font-weight:600; min-width:90px; text-align:right;}
+  .import-row.pendiente{border-color:var(--coral); background:var(--coral-soft);}
+  .imp-top{display:flex; justify-content:space-between; align-items:flex-start; gap:10px;}
+  .imp-desc{font-weight:500; overflow-wrap:anywhere;}
+  .imp-meta{font-size:12px; color:var(--ink-soft);}
+  .import-row .amt{font-weight:600; white-space:nowrap; font-variant-numeric:tabular-nums;}
+  .import-row select{padding:7px 8px; font-size:13px;}
+  .kpi-note{font-size:11.5px; color:var(--ink-soft); margin:2px 0 0;}
+  .cat-tx-row{align-items:center; gap:8px;}
+  .tx-info{display:flex; flex-direction:column; min-width:0; flex:1 1 auto;}
+  .tx-desc{color:var(--ink); overflow-wrap:anywhere;}
+  .tx-amt{flex:none; white-space:nowrap; font-variant-numeric:tabular-nums;}
+  /* Ancho fijo: si no, el select toma el ancho de su opción más larga y
+     aplasta la descripción. Las opciones se ven en el menú nativo. */
+  .tx-move{flex:0 0 34px; width:34px; padding:2px 4px; font-size:12px; border-color:transparent; background:transparent; color:var(--ink-soft); cursor:pointer;}
+  details.cat-mas summary{cursor:pointer; font-size:12px; color:var(--ink-soft); padding:4px 0;}
   .hint{font-size:12px; color:var(--ink-soft); margin:0;}
   .reset-link{font-size:12px; color:var(--ink-soft); text-decoration:underline; cursor:pointer; background:none; border:none; padding:0; font-family:'Inter',sans-serif;}
   .sync-status{font-size:12.5px; margin-top:4px;}
@@ -137,8 +149,8 @@
   </div>
 
   <div class="kpis">
-    <div class="kpi"><p class="kpi-label">Ingresos a hoy</p><p class="kpi-value" id="kpi-ingresos">$0</p></div>
-    <div class="kpi"><p class="kpi-label">Rutina gastada</p><p class="kpi-value" id="kpi-rutina">$0</p></div>
+    <div class="kpi"><p class="kpi-label">Ingresos a hoy</p><p class="kpi-value" id="kpi-ingresos">$0</p><p class="kpi-note" id="kpi-ingresos-nota"></p></div>
+    <div class="kpi"><p class="kpi-label">Gastado del presupuesto</p><p class="kpi-value" id="kpi-rutina">$0</p><p class="kpi-note" id="kpi-rutina-nota"></p></div>
     <div class="kpi"><p class="kpi-label">Especiales</p><p class="kpi-value" id="kpi-especiales">$0</p></div>
   </div>
 
@@ -148,7 +160,7 @@
       <span class="sec-note">claro = presupuesto · coral/rojo = real</span>
     </div>
     <div class="chart-card">
-      <div style="position:relative; width:100%; height:280px;">
+      <div id="chart-box" style="position:relative; width:100%; height:400px;">
         <canvas id="chart" role="img" aria-label="Barras horizontales comparando presupuesto mensual contra gasto real por categoría">Comparación de presupuesto contra gasto real por categoría</canvas>
       </div>
     </div>
@@ -178,7 +190,7 @@
       <h2>Movimientos del Sheet</h2>
       <span class="sec-note">los SMS que tus Atajos ya registraron</span>
     </div>
-    <p class="hint">Trae los movimientos del Google Sheet que todavía no has agregado. Te sugiere la categoría de cada uno según cómo clasificaste antes esa misma descripción o ese mismo monto (ej. tu arriendo). El ahorro y los pagos a tu tarjeta de Banco de Bogotá vienen marcados para ignorar, porque no son gastos nuevos.</p>
+    <p class="hint">Trae los movimientos del Google Sheet que todavía no has agregado y sugiere la categoría de cada uno: por el comercio, por los pagos fijos de tu Excel (arriendo, administración…) o por cómo clasificaste antes algo igual. El ahorro y los pagos a tu tarjeta de Banco de Bogotá vienen para ignorar; lo que no reconozca queda marcado para que elijas tú.</p>
     <div class="form-card">
       <div class="form-row" style="align-items:center;">
         <button onclick="syncFromSheet()" id="sync-btn">Sincronizar desde el Sheet</button>
@@ -212,6 +224,7 @@
     </div>
     <div class="import-preview" id="import-preview"></div>
     <div id="import-confirm" style="display:none; margin-top:10px;">
+      <p class="sync-status error" id="import-aviso"></p>
       <button onclick="confirmImport()">Confirmar</button>
       <button class="secondary" onclick="cancelImport()" style="margin-left:8px;">Cancelar</button>
     </div>
@@ -228,6 +241,7 @@
   <section>
     <div class="sec-head">
       <h2>Ingresos</h2>
+      <span class="sec-note" id="ingresos-nota"></span>
     </div>
     <div class="income-list" id="income-list"></div>
   </section>
@@ -265,6 +279,7 @@ const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto'
 
 // Categorías especiales del selector de importación (no son de BUDGET).
 const CAT_INGRESO = '__ingreso';
+const CAT_ESPECIAL = '__especial';
 const CAT_IGNORAR = '__ignorar';
 
 const METODO_POR_FUENTE = {
@@ -293,33 +308,56 @@ function renderMonthLabel(){
   document.getElementById('month-label').textContent = texto;
 }
 
+// Presupuesto mensual del Excel Finanzas_Anamaria: promedios de la hoja
+// Costo_Vida y, para los "destinados", el tope de la hoja Destinados.
 const BUDGET = [
-  { key: 'uber', name: 'Uber', budget: 415915 },
-  { key: 'mercado', name: 'Mercado', budget: 550000 },
-  { key: 'salud', name: 'Salud', budget: 94000 },
-  { key: 'suscripciones', name: 'Suscripciones', budget: 200000 },
-  { key: 'domicilios', name: 'Domicilios', budget: 200000 },
-  { key: 'peluqueria', name: 'Peluquería', budget: 85400 },
-  { key: 'telco', name: 'Telco (factura completa)', budget: 147800 },
-  { key: 'gimnasio', name: 'Gimnasio', budget: 70250 },
-  { key: 'materiales', name: 'Gastos materiales', budget: 150000 },
-  { key: 'suplementos', name: 'Suplementos', budget: 143333 },
-  { key: 'tinte', name: 'Tinte de pelo', budget: 83333 },
-  { key: 'psicologia', name: 'Psicología', budget: 510000 },
   { key: 'arriendo', name: 'Arriendo', budget: 1020000 },
+  { key: 'administracion', name: 'Administración', budget: 286600 },
+  { key: 'deudas', name: 'Deudas (cuotas mamá)', budget: 327000 },
+  { key: 'splitwise', name: 'Splitwise (hogar compartido)', budget: 382865 },
+  { key: 'uber', name: 'Transporte (Uber)', budget: 500000 },
+  { key: 'mercado', name: 'Mercado (súper)', budget: 370496 },
+  { key: 'domicilios', name: 'Domicilios / restaurantes', budget: 126408 },
+  { key: 'suscripciones', name: 'Suscripciones', budget: 209776 },
+  { key: 'salud', name: 'Salud / farmacia', budget: 209295 },
+  { key: 'peluqueria', name: 'Peluquería', budget: 150000 },
+  { key: 'gimnasio', name: 'Gimnasio', budget: 160000 },
+  { key: 'psicologia', name: 'Psicología', budget: 425000 },
+  { key: 'materiales', name: 'Gastos materiales', budget: 150000 },
+  { key: 'telco', name: 'Telco (celular propio)', budget: 60000 },
+  { key: 'salidas', name: 'Salidas sociales y planes', budget: 350000 },
 ];
+
+// Hoja Ingresos del Excel: salario, mesadas y sobrante de Lausana.
+const INGRESO_ESPERADO = 4050000;
+
+// Categorías que existían antes y ya no están en el Excel.
+const CATEGORIAS_ANTERIORES = { suplementos: 'salud', tinte: 'peluqueria' };
 
 // Palabras clave para auto-categorizar movimientos importados
 const KEYWORDS = {
-  uber: ['UBER', 'PAYU*UBER', 'PAYU UBER'],
-  mercado: ['JENAGRO', 'CARULLA', 'TIENDA D1', 'EXITO', 'ÉXITO', 'SUPERTIEND', 'D1 '],
-  salud: ['COLSANITAS', 'CRUZ VERDE', 'DROGUERIA', 'FARMATODO'],
-  suscripciones: ['APPLE.COM', 'SPOTIFY', 'ROKU', 'MUBI', 'NETFLIX', 'RECHARGE.COM'],
-  domicilios: ['RAPPI', 'DOMICILIO'],
-  peluqueria: ['PELUQUER', 'BOLD SA*PELUQUER', 'BOLD SA PELUQUER'],
+  uber: ['UBER', 'DIDI', 'CABIFY', 'INDRIVE', 'TAXI'],
+  mercado: ['JENAGRO', 'CARULLA', 'TIENDA D1', 'D1 ', 'EXITO', 'ÉXITO', 'SUPERTIEND', 'OLIMPICA', 'JUMBO'],
+  domicilios: ['RAPPI', 'D UNA', 'DOMICILIO', 'IFOOD', 'LA BIRRIA', 'STARBUCKS', 'JUAN VALDEZ', 'RESTAURANTE'],
+  suscripciones: ['APPLE.COM', 'SPOTIFY', 'ROKU', 'MUBI', 'NETFLIX', 'RECHARGE.COM', 'YOUTUBE', 'DISNEY', 'HBO'],
+  salud: ['COLSANITAS', 'COMPANIA DE MEDICINA', 'CRUZ VERDE', 'DROGUERI', 'FARMATODO', 'LOCATEL', 'FARMACIA'],
+  peluqueria: ['PELUQUER'],
+  gimnasio: ['SPINNING', 'GIMNASIO', 'GYM', 'BODYTECH', 'SMART FIT'],
   telco: ['UNE TELCO', 'TIGO', 'CLARO', 'MOVISTAR'],
-  gimnasio: ['SPINNING', 'GIMNASIO', 'GYM'],
+  materiales: ['TEMU', 'CASAIDEAS', 'GLOBAL AUTHENTICITY', 'NIHAOJEWELRY'],
 };
+
+// Pagos fijos que salen por transferencia (Bre-B, QR, "Pagaste…"): el
+// destinatario cambia o no se reconoce, pero el monto es el del Excel.
+// Solo aplica a transferencias, no a compras con tarjeta.
+const PAGOS_FIJOS = [
+  { category: 'arriendo', monto: 1020000, tolerancia: 0.05 },
+  { category: 'administracion', monto: 286600, tolerancia: 0.05 },
+  { category: 'psicologia', monto: 850000, tolerancia: 0.05 },
+  { category: 'gimnasio', monto: 480000, tolerancia: 0.05 },
+  { category: 'deudas', monto: 150000, tolerancia: 0.02 },
+  { category: 'deudas', monto: 177000, tolerancia: 0.02 },
+];
 
 const SPECIALS_DEFAULT = [
   { name: 'Chocó — hotel (tu parte)', amount: 750000 },
@@ -376,7 +414,8 @@ const EXPENSES_DEFAULT = {
   telco: [
     {amount:147800, date:'2026-09-01', method:'Débito Bancolombia', desc:'UNE Telco (factura completa)'},
   ],
-  gimnasio: [], materiales: [], suplementos: [], tinte: [], psicologia: [], arriendo: [],
+  gimnasio: [], materiales: [], psicologia: [], arriendo: [],
+  administracion: [], deudas: [], splitwise: [], salidas: [],
 };
 
 // importedIds: IDs del Sheet ya importados a este mes. Viven en el estado
@@ -402,6 +441,12 @@ function freshDefaults(){
 function normalize(s){
   if(!s || typeof s !== 'object') return freshDefaults();
   if(!s.expenses || typeof s.expenses !== 'object') s.expenses = {};
+  for(const [vieja, nueva] of Object.entries(CATEGORIAS_ANTERIORES)){
+    if(Array.isArray(s.expenses[vieja])){
+      s.expenses[nueva] = (s.expenses[nueva] || []).concat(s.expenses[vieja]);
+    }
+    delete s.expenses[vieja];
+  }
   BUDGET.forEach(c => {
     if(!Array.isArray(s.expenses[c.key])){
       s.expenses[c.key] = EXPENSES_DEFAULT[c.key] ? JSON.parse(JSON.stringify(EXPENSES_DEFAULT[c.key])) : [];
@@ -510,28 +555,33 @@ function amountKey(amount){
   return String(Math.round(amount));
 }
 
+function categoriaVigente(key){
+  const k = CATEGORIAS_ANTERIORES[key] || key;
+  return BUDGET.some(c => c.key === k) ? k : null;
+}
+
 // Sugiere una categoría en orden de confianza:
 // 1) ya clasificaste antes exactamente esta misma descripción
-// 2) la descripción contiene una palabra clave de comercio conocida
-// 3) ya clasificaste antes un movimiento por este mismo monto exacto
-//    (se revisa después de las palabras clave para que un monto que
-//    coincida por casualidad no le gane a un comercio identificado)
-// 4) por defecto, Gastos materiales
-function categorize(desc, amount){
+// 2) es una transferencia por el monto de un pago fijo del Excel
+// 3) la descripción contiene una palabra clave de comercio conocida
+// 4) ya clasificaste antes un movimiento por este mismo monto exacto
+//    (después de las palabras clave, para que un monto que coincida
+//    por casualidad no le gane a un comercio identificado)
+// 5) sin categoría: la eliges tú al importar
+function categorize(desc, amount, esTransferencia){
   const descKey = normalizeDesc(desc);
-  if(descKey && learned.byDesc[descKey]){
-    return { category: learned.byDesc[descKey], source: 'desc' };
+  const aprendidaDesc = descKey && categoriaVigente(learned.byDesc[descKey]);
+  if(aprendidaDesc) return { category: aprendidaDesc, source: 'desc' };
+  if(esTransferencia && amount){
+    const fijo = PAGOS_FIJOS.find(p => Math.abs(amount - p.monto) <= p.monto * p.tolerancia);
+    if(fijo) return { category: fijo.category, source: 'fijo' };
   }
   for(const key in KEYWORDS){
     if(KEYWORDS[key].some(k => descKey.includes(k))) return { category: key, source: 'keyword' };
   }
-  if(amount){
-    const amtKey = amountKey(amount);
-    if(learned.byAmount[amtKey]){
-      return { category: learned.byAmount[amtKey], source: 'amount' };
-    }
-  }
-  return { category: 'materiales', source: 'default' };
+  const aprendidaMonto = amount && categoriaVigente(learned.byAmount[amountKey(amount)]);
+  if(aprendidaMonto) return { category: aprendidaMonto, source: 'amount' };
+  return { category: '', source: 'ninguna' };
 }
 
 function learnFromConfirmed(desc, amount, category){
@@ -569,8 +619,13 @@ function tipoMovimiento(m){
   // Las compras con la tarjeta de Banco de Bogotá ya llegan una por una;
   // sumar también el pago de la tarjeta las contaría dos veces.
   if(m.id.startsWith('BCOLPAG-') && /banco de bogot/i.test(m.descripcion)) return 'pagoTarjeta';
+  // Davivienda es la RappiCard: sus compras no llegan por SMS, así que el
+  // pago se registra como gasto especial (igual que el de agosto).
+  if(m.id.startsWith('BCOLPAG-') && /davivienda/i.test(m.descripcion)) return 'pagoRappiCard';
   return 'gasto';
 }
+
+const PREFIJOS_TRANSFERENCIA = ['BCOLTRF-', 'BCOLQR-', 'BCOLPAG-', 'EXT-BCOL-'];
 
 function movimientoToPending(m){
   const base = {
@@ -579,11 +634,14 @@ function movimientoToPending(m){
     amount: Math.abs(Number(m.monto) || 0),
     date: normalizeDate(m.fecha),
     method: METODO_POR_FUENTE[m.fuente] || m.fuente,
+    fuente: m.fuente,
   };
   const tipo = tipoMovimiento(m);
   if(tipo === 'ingreso') return { ...base, category: CAT_INGRESO, categorySource: 'ingreso' };
+  if(tipo === 'pagoRappiCard') return { ...base, category: CAT_ESPECIAL, categorySource: tipo, nombreEspecial: 'Pago RappiCard (Davivienda)' };
   if(tipo !== 'gasto') return { ...base, category: CAT_IGNORAR, categorySource: tipo };
-  const guess = categorize(base.desc, base.amount);
+  const esTransferencia = PREFIJOS_TRANSFERENCIA.some(p => m.id.startsWith(p));
+  const guess = categorize(base.desc, base.amount, esTransferencia);
   return { ...base, category: guess.category, categorySource: guess.source };
 }
 
@@ -692,25 +750,52 @@ function renderImportPreview(){
     confirmBox.style.display = 'none';
     return;
   }
-  const sourceLabel = { desc: 'recordada', amount: 'por monto', ingreso: 'ingreso', ahorro: 'ahorro', pagoTarjeta: 'pago de tarjeta' };
+  const motivo = {
+    desc: 'como la última vez', amount: 'por el monto', fijo: 'pago fijo del Excel', keyword: 'por el comercio',
+    ingreso: 'ingreso', ahorro: 'ahorro: no es gasto', pagoTarjeta: 'pago de tu tarjeta: no es gasto nuevo',
+    pagoRappiCard: 'pago RappiCard', ninguna: 'no la reconocí: elige una',
+  };
   const opciones = [
+    { value: '', name: '— Elige categoría —' },
     ...BUDGET.map(c => ({ value: c.key, name: c.name })),
+    { value: CAT_ESPECIAL, name: 'Gasto especial (fuera de la rutina)' },
     { value: CAT_INGRESO, name: 'Ingreso (no es gasto)' },
     { value: CAT_IGNORAR, name: 'Ignorar (no sumar)' },
   ];
   box.innerHTML = pendingImport.map((t,i) => `
-    <div class="import-row">
-      <span class="desc">${escapeHtml(t.desc)}${sourceLabel[t.categorySource] ? ` <span class="tag ok">${sourceLabel[t.categorySource]}</span>` : ''}</span>
-      <select onchange="pendingImport[${i}].category=this.value; pendingImport[${i}].categorySource='manual'">
+    <div class="import-row ${t.category ? '' : 'pendiente'}" id="imp-${i}">
+      <div class="imp-top">
+        <span class="imp-desc">${escapeHtml(t.desc)}</span>
+        <span class="amt">${money(t.amount)}</span>
+      </div>
+      <div class="imp-meta">${fechaCorta(t.date)}${t.fuente ? ' · ' + escapeHtml(t.fuente) : ''}${motivo[t.categorySource] ? ' · ' + motivo[t.categorySource] : ''}</div>
+      <select onchange="elegirCategoria(${i}, this.value)" aria-label="Categoría de ${escapeHtml(t.desc)}">
         ${opciones.map(o => `<option value="${o.value}" ${o.value===t.category?'selected':''}>${o.name}</option>`).join('')}
       </select>
-      <span class="amt">${money(t.amount)}</span>
     </div>
   `).join('');
+  document.getElementById('import-aviso').textContent = '';
   confirmBox.style.display = 'block';
 }
 
+function elegirCategoria(i, value){
+  pendingImport[i].category = value;
+  pendingImport[i].categorySource = 'manual';
+  document.getElementById('imp-' + i).classList.toggle('pendiente', !value);
+}
+
+function fechaCorta(iso){
+  const [y, m, d] = String(iso).split('-').map(Number);
+  if(!y || !m || !d) return String(iso);
+  return `${d} ${MESES[m-1].slice(0,3).toLowerCase()}`;
+}
+
 function confirmImport(){
+  const faltan = pendingImport.filter(t => !t.category).length;
+  if(faltan){
+    document.getElementById('import-aviso').textContent = `Te falta elegir la categoría de ${faltan} movimiento(s), marcados en color.`;
+    return;
+  }
   const metodoPorDefecto = pendingImportOrigin === 'sheet' ? 'SMS (Sheet)' : 'Importado';
   let gastos = 0, ingresos = 0, ignorados = 0;
   pendingImport.forEach(t => {
@@ -719,6 +804,9 @@ function confirmImport(){
     }else if(t.category === CAT_INGRESO){
       state.income.push({ name: t.desc, amount: t.amount });
       ingresos++;
+    }else if(t.category === CAT_ESPECIAL){
+      state.specials.push({ name: t.nombreEspecial || t.desc, amount: t.amount });
+      gastos++;
     }else{
       if(!state.expenses[t.category]) state.expenses[t.category] = [];
       state.expenses[t.category].push({ amount: t.amount, date: t.date, method: t.method || metodoPorDefecto, desc: t.desc });
@@ -752,6 +840,44 @@ async function resetMonth(){
   render();
 }
 
+const categoriasAbiertas = new Set();
+
+function recordarAbierta(details){
+  if(details.open) categoriasAbiertas.add(details.dataset.cat);
+  else categoriasAbiertas.delete(details.dataset.cat);
+}
+
+function txRowHtml(catKey, t, i){
+  const destinos = BUDGET.filter(c => c.key !== catKey)
+    .map(c => `<option value="${c.key}">Mover a ${c.name}</option>`).join('');
+  return `
+    <div class="cat-tx-row">
+      <div class="tx-info">
+        <span class="tx-desc">${escapeHtml(t.desc || 'Sin descripción')}</span>
+        <span>${fechaCorta(t.date)} · ${escapeHtml(t.method || '')}</span>
+      </div>
+      <span class="tx-amt">${money(t.amount)}</span>
+      <select class="tx-move" aria-label="Mover o eliminar" onchange="moverMovimiento('${catKey}', ${i}, this.value)">
+        <option value="">⋯</option>${destinos}<option value="__eliminar">Eliminar</option>
+      </select>
+    </div>`;
+}
+
+// Mover enseña a la app (la próxima vez sugiere la nueva categoría).
+// Un movimiento eliminado que vino del Sheet no vuelve a importarse,
+// porque su ID sigue en importedIds.
+function moverMovimiento(desde, i, destino){
+  if(!destino) return;
+  const [t] = state.expenses[desde].splice(i, 1);
+  if(destino !== '__eliminar'){
+    (state.expenses[destino] = state.expenses[destino] || []).push(t);
+    learnFromConfirmed(t.desc, t.amount, destino);
+    saveLearnedCategories();
+  }
+  saveState();
+  render();
+}
+
 let chart;
 function render(){
   renderMonthLabel();
@@ -767,23 +893,29 @@ function render(){
   catList.innerHTML = '';
   let totalRutina = 0;
   BUDGET.forEach(c => {
-    const txs = state.expenses[c.key] || [];
+    const txs = (state.expenses[c.key] || [])
+      .map((t, i) => ({ t, i }))
+      .sort((a, b) => String(b.t.date).localeCompare(String(a.t.date)));
     const real = catTotal(c.key);
     totalRutina += real;
     const pct = Math.min(100, Math.round(real / c.budget * 100));
     const over = real > c.budget;
     const row = document.createElement('div');
     row.className = 'cat-row';
-    const txList = txs.slice(-3).reverse().map(t => `
-      <div class="cat-tx-row"><span>${t.date} · ${t.method}</span><span>${money(t.amount)}</span></div>
-    `).join('');
+    const visibles = txs.slice(0, 3).map(x => txRowHtml(c.key, x.t, x.i)).join('');
+    const resto = txs.slice(3);
+    const mas = resto.length ? `
+      <details class="cat-mas" data-cat="${c.key}" ${categoriasAbiertas.has(c.key) ? 'open' : ''} ontoggle="recordarAbierta(this)">
+        <summary>Ver ${resto.length} movimiento(s) más</summary>
+        ${resto.map(x => txRowHtml(c.key, x.t, x.i)).join('')}
+      </details>` : '';
     row.innerHTML = `
       <div class="cat-top">
         <span class="cat-name">${c.name}${over ? '<span class="tag over">sobre tope</span>' : ''}</span>
         <span class="cat-nums"><b>${money(real)}</b> / ${money(c.budget)}</span>
       </div>
       <div class="bar-track"><div class="bar-fill ${over ? 'over' : ''}" style="width:${pct}%"></div></div>
-      ${txList ? `<div class="cat-tx">${txList}</div>` : ''}
+      ${txs.length ? `<div class="cat-tx">${visibles}${mas}</div>` : ''}
     `;
     catList.appendChild(row);
   });
@@ -800,9 +932,14 @@ function render(){
   `).join('');
   const totalIngresos = state.income.reduce((a,i) => a + i.amount, 0);
 
+  const totalPresupuesto = BUDGET.reduce((a, c) => a + c.budget, 0);
   document.getElementById('kpi-ingresos').textContent = money(totalIngresos);
+  document.getElementById('kpi-ingresos-nota').textContent = `esperado ${money(INGRESO_ESPERADO)}`;
   document.getElementById('kpi-rutina').textContent = money(totalRutina);
+  document.getElementById('kpi-rutina-nota').textContent = `de ${money(totalPresupuesto)} presupuestado`;
   document.getElementById('kpi-especiales').textContent = money(totalEspeciales);
+  document.getElementById('ingresos-nota').textContent = `tu Excel espera ${money(INGRESO_ESPERADO)} al mes`;
+  document.getElementById('chart-box').style.height = (BUDGET.length * 26 + 40) + 'px';
 
   const balance = totalIngresos - totalRutina - totalEspeciales;
   const heroEl = document.getElementById('hero-balance');
