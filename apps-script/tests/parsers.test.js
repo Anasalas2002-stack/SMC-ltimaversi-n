@@ -32,7 +32,6 @@ function cargarScript({ hoja = crearHoja([['Fecha', 'Descripción', 'Monto', 'Fu
     },
     SpreadsheetApp: { openById: () => ({ getSheetByName: () => hoja, insertSheet: () => hoja }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: k => (k === 'CLAVE_LECTURA' ? claveLectura : null) }) },
-    LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
     Session: { getScriptTimeZone: () => 'America/Bogota' },
     Utilities: {
       formatDate: d => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`,

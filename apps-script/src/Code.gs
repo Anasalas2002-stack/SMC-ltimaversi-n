@@ -94,25 +94,17 @@ function doPost(e) {
       });
     }
 
-    // Evita que dos envíos simultáneos del mismo SMS pasen ambos el chequeo
-    // de duplicados antes de que cualquiera de los dos escriba.
-    const lock = LockService.getScriptLock();
-    lock.waitLock(10000);
-    try {
-      const sheet = getSheet();
+    const sheet = getSheet();
 
-      if (id && movimientoExiste(sheet, { id, fecha, monto, fuente })) {
-        return jsonResponse({
-          ok: true,
-          duplicate: true,
-          message: 'El movimiento ya estaba registrado.'
-        });
-      }
-
-      agregarFila(sheet, [fecha, descripcion, monto, fuente, id]);
-    } finally {
-      lock.releaseLock();
+    if (id && movimientoExiste(sheet, { id, fecha, monto, fuente })) {
+      return jsonResponse({
+        ok: true,
+        duplicate: true,
+        message: 'El movimiento ya estaba registrado.'
+      });
     }
+
+    agregarFila(sheet, [fecha, descripcion, monto, fuente, id]);
 
     return jsonResponse({
       ok: true,
