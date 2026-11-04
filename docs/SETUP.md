@@ -95,7 +95,30 @@ cierta hora del día** o **al conectar el cargador**, con "Ejecutar
 inmediatamente". Cada barrido revisa los últimos 2 días y el Apps Script
 descarta lo que ya estaba.
 
-### 2.5. `clasp` (opcional)
+### 2.5. Lector de correos (los avisos llegan solos, sin el iPhone)
+
+Una regla de Outlook reenvía los avisos de Bancolombia, Banco de Bogotá y
+RappiCard a una cuenta de Gmail. Ahí corre un segundo proyecto de Apps
+Script,
+[`apps-script/lector-correos/Lector.gs`](../apps-script/lector-correos/Lector.gs),
+que cada 10 minutos le manda los avisos nuevos al Web App (campo `correo`)
+y les pone la etiqueta `GastosMensuales`. `Code.gs` saca la frase del
+movimiento (`avisoDeCorreo`) y la registra como si fuera un SMS, con el
+mismo ID, así que una compra que llegue por SMS y por correo queda una vez.
+
+1. Con la sesión de esa cuenta de Gmail, crea un proyecto nuevo en
+   script.google.com, pega `Lector.gs` en `Código.gs`, reemplaza
+   `PEGA_AQUI_LA_URL_DEL_WEB_APP` por la URL del Web App y guarda.
+2. Elige la función `activar` y dale **Ejecutar**. Acepta los permisos
+   (leer Gmail, conectarse a servicios externos, activadores).
+3. Desde ahí corre sola. En **Ejecuciones** se ve qué respondió el Web App
+   para cada correo.
+
+Banco de Bogotá no manda correo por todas las compras (en octubre no
+llegaron las de Uber ni las de internet), así que conviene dejar también el
+Atajo de Banco de Bogotá.
+
+### 2.6. `clasp` (opcional)
 
 Solo si quieres desplegar el Apps Script desde la terminal en vez de pegar
 el código en el editor web:

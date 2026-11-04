@@ -155,3 +155,167 @@ test('doGet · devuelve las filas, con fechas tipo Date convertidas a dd/mm/aaaa
     { fecha: '21/09/2026', descripcion: 'Rappi', monto: 39900, fuente: 'Banco de Bogotá', id: 'BDB-260921184112-39900' },
   ]);
 });
+
+// ---------- Correos reenviados (lector de correos) ----------
+// Cuerpos reales recortados y anonimizados: encabezado del reenvío, la
+// frase del movimiento y parte del texto legal que traen alrededor.
+const CORREO = {
+  bdb: (fechaHora, monto, comercio) => [
+    '________________________________',
+    'De: NOTIFICACIONES@BANCODEBOGOTA.NET <NOTIFICACIONES@BANCODEBOGOTA.NET>',
+    'Enviados: miércoles, 14 de octubre de 2026 1:19:32 p. m. (UTC-05:00) Bogota, Lima, Quito, Rio Branco',
+    'Asunto: Banco de Bogotá, Notificación de compra',
+    '',
+    'Señor(a):',
+    'TITULAR',
+    '',
+    `El Banco de Bogotá le informa que la compra realizada el día ${fechaHora} fue aprobada por un monto de $ ${monto} pesos, desde el comercio ${comercio} , con la Tarjeta Crédito terminada en 0000 .`,
+    '',
+    'En caso de no haber realizado esta transacción, por favor comuníquese inmediatamente con nuestra línea de atención.',
+  ].join('\n'),
+  bancolombia: [
+    '________________________________',
+    'De: alertasynotificaciones@ayn.notificacionesbancolombia.com <alertasynotificaciones@ayn.notificacionesbancolombia.com>',
+    'Asunto: Alertas y Notificaciones',
+    '',
+    '[Logo Bancolombia]',
+    '¡Listo!',
+    'Todo salió bien con tus movimientos',
+    '',
+    'Bancolombia: Transferiste $110,000.00 desde tu cuenta *3335 a la cuenta *0000000000 el 31/10/26 a las 21:00. ¿Dudas? Llamanos al 018000931987. Estamos cerca.',
+    '',
+    '[Vigilado Superintendencia Financiera de Colombia Bancolombia_S.A. Establecimiento Bancario]',
+  ].join('\n'),
+  rappi: [
+    '________________________________',
+    'De: RappiCard <noreply@rappicard.co>',
+    'Asunto: RappiCard - Resumen de transacción',
+    '',
+    '¡Hola, TITULAR!',
+    'Realizaste una compra con tu RappiCard.',
+    '',
+    'Detalle de tu transacción:',
+    '',
+    'Monto',
+    '',
+    '$62.097',
+    '',
+    '________________________________',
+    '',
+    'Método de pago',
+    '',
+    '*0000',
+    '',
+    '________________________________',
+    '',
+    'Comercio',
+    '',
+    'GOOGLE WORKSPACE',
+    '',
+    '________________________________',
+    '',
+    'Fecha de la transacción',
+    '',
+    '2026-11-01 08:01:10',
+    '',
+    'Producto de Davivienda S.A.',
+  ].join('\n'),
+  extractoRappi: [
+    'De: RappiCard <noreply@rappicard.co>',
+    'Asunto: ¡Llegó el extracto de tu RappiCard!',
+    '',
+    'Tu extracto ya está disponible. Pago total $621.623. Fecha de pago 10 nov 2026.',
+  ].join('\n'),
+};
+
+test('correo · Banco de Bogotá da el mismo movimiento (y el mismo ID) que el SMS', () => {
+  const { ctx } = cargarScript();
+  const aviso = ctx.avisoDeCorreo(CORREO.bdb('2026/10/14 13:19:27', '14,824.00', 'JENAGRO 65 SAS'));
+  assert.deepEqual({ ...ctx.parsearSMS(aviso) }, {
+    fecha: '14/10/2026', descripcion: 'JENAGRO 65 SAS', monto: 14824, fuente: 'Banco de Bogotá', id: 'BDB-261014131927-14824',
+  });
+  const sms = 'Banco de Bogota: Tu compra por 14,824 fue aprobada con Tarjeta Crédito 6359 el 14/10/26 13:19:27 en JENAGRO 65 SAS ¿Dudas? Llama a la Servilinea';
+  assert.equal(ctx.parsearSMS(sms).id, 'BDB-261014131927-14824');
+});
+
+test('correo · Banco de Bogotá con centavos guarda el monto en pesos', () => {
+  const { ctx } = cargarScript();
+  const r = ctx.parsearSMS(ctx.avisoDeCorreo(CORREO.bdb('2026/10/29 15:26:06', '111,251.03', 'TARGET T-2799')));
+  assert.equal(r.monto, 111251);
+  assert.equal(r.descripcion, 'TARGET T-2799');
+  assert.equal(r.id, 'BDB-261029152606-111251');
+});
+
+test('correo · Bancolombia trae la misma frase del SMS', () => {
+  const { ctx } = cargarScript();
+  const aviso = ctx.avisoDeCorreo(CORREO.bancolombia);
+  assert.match(aviso, /^Bancolombia: Transferiste \$110,000\.00/);
+  assert.equal(ctx.parsearSMS(aviso).id, 'BCOLTRF-2610312100-110000');
+});
+
+test('correo · RappiCard', () => {
+  const { ctx } = cargarScript();
+  const aviso = ctx.avisoDeCorreo(CORREO.rappi);
+  assert.equal(aviso, 'RappiCard: compra por $62.097 en GOOGLE WORKSPACE el 2026-11-01 08:01:10');
+  assert.deepEqual({ ...ctx.parsearSMS(aviso) }, {
+    fecha: '01/11/2026', descripcion: 'GOOGLE WORKSPACE', monto: 62097, fuente: 'RappiCard', id: 'RAPPI-20261101080110-62097',
+  });
+});
+
+test('doPost · un correo se registra una vez, aunque la compra ya haya llegado por SMS', () => {
+  const { ctx, hoja } = cargarScript();
+  const sms = 'Banco de Bogota: Tu compra por 14,824 fue aprobada con Tarjeta Crédito 6359 el 14/10/26 13:19:27 en JENAGRO 65 SAS ¿Dudas? Llama a la Servilinea';
+  assert.equal(post(ctx, { texto: sms }).message, 'Movimiento registrado.');
+  assert.equal(post(ctx, { correo: CORREO.bdb('2026/10/14 13:19:27', '14,824.00', 'JENAGRO 65 SAS') }).duplicate, true);
+  assert.equal(post(ctx, { correo: CORREO.rappi }).message, 'Movimiento registrado.');
+  assert.equal(post(ctx, { correo: CORREO.rappi }).duplicate, true);
+  assert.equal(hoja.filas.length, 3);
+  assert.deepEqual(hoja.filas[2], ['01/11/2026', 'GOOGLE WORKSPACE', 62097, 'RappiCard', 'RAPPI-20261101080110-62097']);
+});
+
+test('doPost · un correo que no es aviso (extracto) se ignora sin escribir', () => {
+  const { ctx, hoja } = cargarScript();
+  const r = post(ctx, { correo: CORREO.extractoRappi });
+  assert.equal(r.ok, false);
+  assert.equal(r.ignorado, true);
+  assert.equal(hoja.filas.length, 1);
+});
+
+// ---------- Lector.gs ----------
+function cargarLector({ codigos }) {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'lector-correos', 'Lector.gs'), 'utf8');
+  const etiquetados = [];
+  const enviados = [];
+  const hilos = codigos.map((codigo, i) => ({
+    codigo,
+    getMessages: () => [{ getSubject: () => `aviso ${i}`, getPlainBody: () => `cuerpo ${i}` }],
+    addLabel() { etiquetados.push(i); },
+  }));
+  let busqueda;
+  const context = {
+    console: { log() {} },
+    GmailApp: {
+      getUserLabelByName: () => null,
+      createLabel: nombre => ({ nombre }),
+      search: q => { busqueda = q; return hilos; },
+    },
+    UrlFetchApp: {
+      fetch: (url, opciones) => {
+        enviados.push(JSON.parse(opciones.payload));
+        const i = enviados.length - 1;
+        return { getResponseCode: () => hilos[i].codigo, getContentText: () => '{"ok":true}' };
+      },
+    },
+  };
+  vm.createContext(context);
+  vm.runInContext(source, context, { filename: 'Lector.gs' });
+  return { ctx: context, etiquetados, enviados, busqueda: () => busqueda };
+}
+
+test('lector · manda cada correo al Web App y solo etiqueta lo que se envió bien', () => {
+  const { ctx, etiquetados, enviados, busqueda } = cargarLector({ codigos: [200, 500, 200] });
+  ctx.revisarCorreos();
+  assert.deepEqual(enviados, [{ correo: 'cuerpo 0' }, { correo: 'cuerpo 1' }, { correo: 'cuerpo 2' }]);
+  assert.deepEqual(etiquetados, [0, 2], 'el que falló se reintenta en la próxima vuelta');
+  assert.match(busqueda(), /-label:GastosMensuales/);
+});

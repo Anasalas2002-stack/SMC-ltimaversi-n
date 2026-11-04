@@ -55,6 +55,21 @@ function doPost(e) {
 
     const data = JSON.parse(e.postData.contents);
 
+    // El lector de correos manda el correo completo; de ahí se saca solo
+    // la frase del movimiento y sigue el mismo camino que un SMS.
+    if (data.correo) {
+      const aviso = avisoDeCorreo(data.correo);
+      delete data.correo;
+      if (!aviso) {
+        return jsonResponse({
+          ok: false,
+          ignorado: true,
+          error: 'El correo no es un aviso de movimiento.'
+        });
+      }
+      data.texto = aviso;
+    }
+
     let monto, fecha, descripcion, fuente, id;
 
     if (data.texto) {
@@ -123,6 +138,8 @@ function doPost(e) {
 function parsearSMS(texto) {
   const parsers = [
     parseBancoDeBogotaCompra,
+    parseBancoDeBogotaCorreo,
+    parseRappiCardCompra,
     parseBancolombiaCompra,
     parseBancolombiaPagoProducto,
     parseBancolombiaTransferenciaEnviada,
@@ -153,6 +170,64 @@ function parseBancoDeBogotaCompra(texto) {
     fuente: 'Banco de Bogotá',
     id: `BDB-${yy}${mm}${dd}${hh}${mi}${ss}-${montoNumero}`,
   };
+}
+
+// Correo: "...la compra realizada el día 2026/10/14 13:19:27 fue aprobada
+//  por un monto de $ 14,824.00 pesos, desde el comercio JENAGRO 65 SAS ,
+//  con la Tarjeta Crédito terminada en 6359". Da el mismo ID que el SMS de
+//  esa compra (los centavos se descartan, como en el SMS), así que una
+//  compra que llegue por los dos lados no se duplica.
+function parseBancoDeBogotaCorreo(texto) {
+  const m = texto.match(/compra realizada el d[ií]a\s+(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\s+fue aprobada por un monto de\s*\$\s*([\d,]+)(?:\.\d+)?\s*pesos,?\s*desde el comercio\s+(.+?)\s*,\s*con la Tarjeta/i);
+  if (!m) return null;
+  const [, yyyy, mm, dd, hh, mi, ss, montoTxt, comercio] = m;
+  const montoNumero = Number(montoTxt.replace(/,/g, ''));
+  return {
+    monto: montoNumero,
+    fecha: `${dd}/${mm}/${yyyy}`,
+    descripcion: comercio.trim(),
+    fuente: 'Banco de Bogotá',
+    id: `BDB-${yyyy.slice(2)}${mm}${dd}${hh}${mi}${ss}-${montoNumero}`,
+  };
+}
+
+// "RappiCard: compra por $62.097 en GOOGLE WORKSPACE el
+//  2026-11-01 08:01:10" (frase que arma avisoDeCorreo con los campos del
+//  correo de RappiCard).
+function parseRappiCardCompra(texto) {
+  const m = texto.match(/RappiCard:\s*compra por\s*\$\s*([\d.,]+)\s+en\s+(.+?)\s+el\s+(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})/i);
+  if (!m) return null;
+  const [, montoTxt, comercio, yyyy, mm, dd, hh, mi, ss] = m;
+  const montoNumero = parseMontoCOP(montoTxt);
+  return {
+    monto: montoNumero,
+    fecha: `${dd}/${mm}/${yyyy}`,
+    descripcion: comercio.trim(),
+    fuente: 'RappiCard',
+    id: `RAPPI-${yyyy}${mm}${dd}${hh}${mi}${ss}-${montoNumero}`,
+  };
+}
+
+// Los correos reenviados traen encabezados, publicidad y avisos legales.
+// Esto saca solo la frase del movimiento, en un formato que los parsers ya
+// entienden. Devuelve null si el correo no es un aviso (p. ej. un extracto).
+function avisoDeCorreo(correo) {
+  const s = String(correo);
+  // Bancolombia pone en el correo la misma frase del SMS (hasta el
+  // siguiente párrafo, por si el texto plano viene partido en líneas).
+  const bancolombia = s.match(/Bancolombia:[\s\S]*?(?=\n\s*\n|$)/);
+  if (bancolombia) return bancolombia[0].replace(/\s+/g, ' ').trim();
+  const bdb = s.match(/la compra realizada el d[ií]a[\s\S]+?terminada en \d+/i);
+  if (bdb) return bdb[0].replace(/\s+/g, ' ');
+  if (/RappiCard/i.test(s)) {
+    const monto = s.match(/Monto\s+\$\s*([\d.,]+)/i);
+    const comercio = s.match(/Comercio\s+([^\n]+)/i);
+    const fecha = s.match(/Fecha de la transacci[oó]n\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})/i);
+    if (monto && comercio && fecha) {
+      return `RappiCard: compra por $${monto[1]} en ${comercio[1].trim()} el ${fecha[1]}`;
+    }
+  }
+  return null;
 }
 
 // "Bancolombia: Compraste $8.800,00 en BOLD SA*DROGUERI con tu T.Deb

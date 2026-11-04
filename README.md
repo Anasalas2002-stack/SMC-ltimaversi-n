@@ -1,9 +1,10 @@
 # GastosMensuales
 
-Control de gastos personal alimentado por los SMS del banco.
+Control de gastos personal alimentado por los avisos del banco (correo y SMS).
 
 ```
-SMS del banco → Atajo de iPhone → Apps Script → Google Sheet → app de presupuesto
+correo del banco → lector de correos (Apps Script) ┐
+SMS del banco    → Atajo de iPhone                 ┴→ Apps Script → Google Sheet → app de presupuesto
 ```
 
 - **`apps-script/`**: Web App de Google Apps Script.
@@ -21,6 +22,7 @@ SMS del banco → Atajo de iPhone → Apps Script → Google Sheet → app de pr
 apps-script/
   src/Code.gs          Web App (doPost: SMS → Sheet, doGet: Sheet → app)
   src/appsscript.json  manifiesto
+  lector-correos/      Lector.gs: revisa el correo cada 10 min y manda los avisos al Web App
   tests/               pruebas con SMS reales (node --test)
 index.html             app de presupuesto (GitHub Pages)
 docs/SETUP.md          configuración manual paso a paso
@@ -32,4 +34,4 @@ docs/SETUP.md          configuración manual paso a paso
 cd apps-script && npm test
 ```
 
-Configuración completa (Apps Script, GitHub Pages, Atajos): [`docs/SETUP.md`](docs/SETUP.md).
+Configuración completa (Apps Script, lector de correos, GitHub Pages, Atajos): [`docs/SETUP.md`](docs/SETUP.md).
