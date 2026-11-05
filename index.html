@@ -198,7 +198,7 @@
       <h2>Movimientos del Sheet</h2>
       <span class="sec-note">los avisos de correo y SMS que ya están en el Sheet</span>
     </div>
-    <p class="hint">Trae los movimientos del Google Sheet que todavía no has agregado y sugiere la categoría de cada uno: por el comercio, por los pagos fijos de tu Excel (arriendo, administración…) o por cómo clasificaste antes algo igual. El ahorro y los pagos a tu tarjeta de Banco de Bogotá vienen para ignorar; lo que no reconozca queda marcado para que elijas tú.</p>
+    <p class="hint">Trae los movimientos del Google Sheet que todavía no has agregado y sugiere la categoría de cada uno: por el comercio, por los pagos fijos de tu Excel (arriendo, administración…) o por cómo clasificaste antes algo igual. Lo que pasas a tus bolsillos de pagos y los pagos a tus tarjetas vienen para ignorar (lo del bolsillo Ahorro va a Ahorro); lo que no reconozca queda marcado para que elijas tú.</p>
     <div class="form-card">
       <div class="form-row" style="align-items:center;">
         <button onclick="syncFromSheet()" id="sync-btn">Sincronizar desde el Sheet</button>
@@ -362,6 +362,12 @@ const BUDGET = [
   { key: 'psicologia', name: 'Psicología', budget: 510000 },
   { key: 'materiales', name: 'Gastos materiales', budget: 150000 },
   { key: 'telco', name: 'Telco (celular propio)', budget: 60000 },
+  // Agregadas por Ana María. Ahorro es el monto del Excel; Viajes es lo que
+  // hay que apartar al mes para el próximo viaje; Inversiones, el pago
+  // mensual a Acciones y Valores.
+  { key: 'viajes', name: 'Viajes', budget: 150000 },
+  { key: 'inversiones', name: 'Inversiones', budget: 60000 },
+  { key: 'ahorro', name: 'Ahorro', budget: 99970 },
 ];
 
 // Hoja Ingresos del Excel: salario Naur, papá (Lausana + aporte) y mamá.
@@ -379,8 +385,10 @@ const KEYWORDS = {
   salud: ['COLSANITAS', 'COMPANIA DE MEDICINA', 'CRUZ VERDE', 'DROGUERI', 'FARMATODO', 'LOCATEL', 'FARMACIA'],
   peluqueria: ['PELUQUER'],
   gimnasio: ['SPINNING', 'GIMNASIO', 'GYM', 'BODYTECH', 'SMART FIT'],
-  telco: ['UNE TELCO', 'TIGO', 'CLARO', 'MOVISTAR'],
+  telco: ['UNE TELCO', 'UNE EPM', 'TIGO', 'CLARO', 'MOVISTAR'],
   materiales: ['TEMU', 'CASAIDEAS', 'GLOBAL AUTHENTICITY', 'NIHAOJEWELRY'],
+  viajes: ['AVIANCA', 'LATAM', 'SATENA', 'WINGO', 'AIRBNB', 'BOOKING', 'DESPEGAR', 'HOTEL', 'KAJUYALI'],
+  inversiones: ['ACCIONES Y VALORES', 'TRII', 'TYBA'],
 };
 
 // Pagos fijos que salen por transferencia (Bre-B, QR, "Pagaste…"): el
@@ -604,8 +612,10 @@ function categoriaVigente(key){
 
 // Sugiere una categoría en orden de confianza:
 // 1) ya clasificaste antes exactamente esta misma descripción
-// 2) es una transferencia por el monto de un pago fijo del Excel
-// 3) la descripción contiene una palabra clave de comercio conocida
+// 2) la descripción contiene una palabra clave de comercio conocida
+// 3) es una transferencia por el monto de un pago fijo del Excel (después
+//    de las palabras clave: la factura de UNE, $147.800, cae dentro del
+//    margen de la cuota de $150.000 y no es una deuda)
 // 4) ya clasificaste antes un movimiento por este mismo monto exacto
 //    (después de las palabras clave, para que un monto que coincida
 //    por casualidad no le gane a un comercio identificado)
@@ -614,12 +624,12 @@ function categorize(desc, amount, esTransferencia){
   const descKey = normalizeDesc(desc);
   const aprendidaDesc = descKey && categoriaVigente(learned.byDesc[descKey]);
   if(aprendidaDesc) return { category: aprendidaDesc, source: 'desc' };
+  for(const key in KEYWORDS){
+    if(KEYWORDS[key].some(k => descKey.includes(k))) return { category: key, source: 'keyword' };
+  }
   if(esTransferencia && amount){
     const fijo = PAGOS_FIJOS.find(p => Math.abs(amount - p.monto) <= p.monto * p.tolerancia);
     if(fijo) return { category: fijo.category, source: 'fijo' };
-  }
-  for(const key in KEYWORDS){
-    if(KEYWORDS[key].some(k => descKey.includes(k))) return { category: key, source: 'keyword' };
   }
   const aprendidaMonto = amount && categoriaVigente(learned.byAmount[amountKey(amount)]);
   if(aprendidaMonto) return { category: aprendidaMonto, source: 'amount' };
@@ -686,6 +696,10 @@ function movimientoToPending(m){
   const tipo = tipoMovimiento(m);
   if(tipo === 'ingreso') return { ...base, category: CAT_INGRESO, categorySource: 'ingreso' };
   if(tipo === 'pagoRappiCard') return { ...base, category: CAT_ESPECIAL, categorySource: tipo, nombreEspecial: 'Pago RappiCard (Davivienda)' };
+  // Los bolsillos con nombre (Arriendo, Telco…) son plata apartada para
+  // pagar algo que se registra cuando se paga; solo el bolsillo Ahorro es
+  // ahorro de verdad.
+  if(tipo === 'ahorro' && base.desc === 'Ahorro en bolsillo') return { ...base, category: 'ahorro', categorySource: 'bolsilloAhorro' };
   if(tipo !== 'gasto') return { ...base, category: CAT_IGNORAR, categorySource: tipo };
   const esTransferencia = PREFIJOS_TRANSFERENCIA.some(p => m.id.startsWith(p));
   const guess = categorize(base.desc, base.amount, esTransferencia);
@@ -799,7 +813,7 @@ function renderImportPreview(){
   }
   const motivo = {
     desc: 'como la última vez', amount: 'por el monto', fijo: 'pago fijo del Excel', keyword: 'por el comercio',
-    ingreso: 'ingreso', ahorro: 'ahorro: no es gasto', pagoTarjeta: 'pago de tu tarjeta: no es gasto nuevo',
+    ingreso: 'ingreso', ahorro: 'bolsillo para un pago: no es gasto', bolsilloAhorro: 'bolsillo Ahorro', pagoTarjeta: 'pago de tu tarjeta: no es gasto nuevo',
     pagoRappiCard: 'pago RappiCard', ninguna: 'no la reconocí: elige una',
   };
   const opciones = [
