@@ -144,6 +144,7 @@ function parsearSMS(texto) {
     parseBancolombiaPagoProducto,
     parseBancolombiaTransferenciaEnviada,
     parseBancolombiaTransferenciaRecibida,
+    parseBancolombiaTransferenciaRecibidaLlave,
     parseBancolombiaPagoQR,
     parseBancolombiaAhorroBolsillo,
   ];
@@ -306,6 +307,23 @@ function parseBancolombiaTransferenciaRecibida(texto) {
   };
 }
 
+// "Bancolombia: Anamaria, recibiste una transferencia de LUIS PEREZ por
+//  $48,500.00 en tu cuenta *3335 conectada a la llave 1234567890 el
+//  05/11/26 a las 10:23..." (formato nuevo, desde noviembre de 2026).
+function parseBancolombiaTransferenciaRecibidaLlave(texto) {
+  const m = texto.match(/recibiste una transferencia de\s+(.+?)\s+por\s*\$\s*([\d,.]*\d)\s+en tu cuenta[\s\S]*?el\s+(\d{2})\/(\d{2})\/(\d{2})\s+a las\s+(\d{2}):(\d{2})/i);
+  if (!m) return null;
+  const [, remitente, montoTxt, dd, mm, yy, hh, mi] = m;
+  const montoNumero = parseMontoCOP(montoTxt);
+  return {
+    monto: montoNumero,
+    fecha: `${dd}/${mm}/20${yy}`,
+    descripcion: `De ${remitente.trim()}`,
+    fuente: 'Bancolombia',
+    id: `BCOLREC-20${yy}${mm}${dd}${hh}${mi}-${montoNumero}`,
+  };
+}
+
 // "Bancolombia: ANA MARIA SALAS GALINDO pagaste $9,200.00 por codigo QR
 //  desde tu cuenta *3335 a la llave 0092747202 el 13/09/2026 a las 17:07..."
 function parseBancolombiaPagoQR(texto) {
@@ -389,9 +407,12 @@ function agregarFila(sheet, fila) {
   sheet.getRange(row, 1, 1, fila.length).setValues([fila]);
 }
 
-// Además del mismo ID, cuenta como repetido un movimiento que ya se cargó
-// desde un extracto (ID "EXT-…") con la misma fecha, monto y banco: si no,
-// el barrido de SMS volvería a agregar las compras de los últimos días.
+// Además del mismo ID, cuenta como repetido:
+// - un movimiento que ya se cargó desde un extracto (ID "EXT-…") con la
+//   misma fecha, monto y banco: si no, el barrido de SMS volvería a agregar
+//   las compras de los últimos días;
+// - una compra de Banco de Bogotá con el mismo monto y casi la misma hora:
+//   el SMS y el correo de una compra a veces difieren en uno o dos segundos.
 function movimientoExiste(sheet, mov) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return false;
@@ -399,11 +420,25 @@ function movimientoExiste(sheet, mov) {
   const fecha = fechaTexto(mov.fecha, tz);
   return sheet.getRange(2, 1, lastRow - 1, 5).getValues().some(([f, , monto, fuente, id]) => {
     if (String(id) === mov.id) return true;
+    if (mismaCompraBdB(id, mov.id)) return true;
     return String(id).startsWith('EXT-') &&
       fuente === mov.fuente &&
       Number(monto) === Number(mov.monto) &&
       fechaTexto(f, tz) === fecha;
   });
+}
+
+// IDs "BDB-aammddhhmmss-monto" con el mismo monto y a menos de 2 minutos.
+function mismaCompraBdB(idA, idB) {
+  const a = String(idA).match(/^BDB-(\d{12})-(.+)$/);
+  const b = String(idB).match(/^BDB-(\d{12})-(.+)$/);
+  if (!a || !b || a[2] !== b[2]) return false;
+  return Math.abs(segundosBdB(a[1]) - segundosBdB(b[1])) <= 120;
+}
+
+function segundosBdB(t) {
+  const [yy, mm, dd, hh, mi, ss] = t.match(/\d\d/g).map(Number);
+  return Date.UTC(2000 + yy, mm - 1, dd, hh, mi, ss) / 1000;
 }
 
 // Fechas del Sheet a "dd/mm/aaaa": pueden ser texto dd/mm/aaaa, texto

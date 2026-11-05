@@ -368,7 +368,11 @@ const BUDGET = [
   { key: 'viajes', name: 'Viajes', budget: 150000 },
   { key: 'inversiones', name: 'Inversiones', budget: 60000 },
   { key: 'ahorro', name: 'Ahorro', budget: 99970 },
+  // Gastos del negocio pagados con tu plata: se muestran, pero no suman a
+  // tu presupuesto ni a tu balance personal.
+  { key: 'amana', name: 'Amaná (negocio)', budget: 0, aparte: true },
 ];
+const BUDGET_PERSONAL = BUDGET.filter(c => !c.aparte);
 
 // Hoja Ingresos del Excel: salario Naur, papá (Lausana + aporte) y mamá.
 const INGRESO_ESPERADO = 5150000;
@@ -386,9 +390,10 @@ const KEYWORDS = {
   peluqueria: ['PELUQUER'],
   gimnasio: ['SPINNING', 'GIMNASIO', 'GYM', 'BODYTECH', 'SMART FIT'],
   telco: ['UNE TELCO', 'UNE EPM', 'TIGO', 'CLARO', 'MOVISTAR'],
-  materiales: ['TEMU', 'CASAIDEAS', 'GLOBAL AUTHENTICITY', 'NIHAOJEWELRY'],
+  materiales: ['TEMU', 'CASAIDEAS', 'GLOBAL AUTHENTICITY'],
   viajes: ['AVIANCA', 'LATAM', 'SATENA', 'WINGO', 'AIRBNB', 'BOOKING', 'DESPEGAR', 'HOTEL', 'KAJUYALI'],
   inversiones: ['ACCIONES Y VALORES', 'TRII', 'TYBA'],
+  amana: ['GOOGLE WORKSPACE', 'SHOPIFY', 'HOSTINGER', 'NIHAOJEWELRY', 'AMANAJEW'],
 };
 
 // Pagos fijos que salen por transferencia (Bre-B, QR, "Pagaste…"): el
@@ -716,7 +721,7 @@ async function syncFromSheet(){
   btn.disabled = true;
   setSyncStatus('Sincronizando…', false);
   try{
-    const movimientos = await fetchMovimientos();
+    const movimientos = sinComprasRepetidas(await fetchMovimientos());
     const yaImportados = new Set(state.importedIds);
     const nuevos = movimientos.filter(m => m.id && !yaImportados.has(m.id) && m.fuente !== 'PRUEBA');
     // La app lleva un mes a la vez: lo de otros meses no debe sumar aquí.
@@ -738,6 +743,29 @@ async function syncFromSheet(){
   }finally{
     btn.disabled = false;
   }
+}
+
+// El SMS y el correo de una misma compra de Banco de Bogotá pueden quedar
+// en el Sheet con uno o dos segundos de diferencia (IDs
+// "BDB-aammddhhmmss-monto"): se cuenta solo el primero.
+function mismaCompraBdB(idA, idB){
+  const a = String(idA).match(/^BDB-(\d{12})-(.+)$/);
+  const b = String(idB).match(/^BDB-(\d{12})-(.+)$/);
+  if(!a || !b || a[2] !== b[2]) return false;
+  const segundos = t => {
+    const [yy, mm, dd, hh, mi, ss] = t.match(/\d\d/g).map(Number);
+    return Date.UTC(2000 + yy, mm - 1, dd, hh, mi, ss) / 1000;
+  };
+  return Math.abs(segundos(a[1]) - segundos(b[1])) <= 120;
+}
+
+function sinComprasRepetidas(movimientos){
+  const vistas = [];
+  return movimientos.filter(m => {
+    if(vistas.some(id => mismaCompraBdB(id, m.id))) return false;
+    vistas.push(m.id);
+    return true;
+  });
 }
 
 function money(n){
@@ -958,9 +986,9 @@ function render(){
       .map((t, i) => ({ t, i }))
       .sort((a, b) => String(b.t.date).localeCompare(String(a.t.date)));
     const real = catTotal(c.key);
-    totalRutina += real;
-    const pct = Math.min(100, Math.round(real / c.budget * 100));
-    const over = real > c.budget;
+    if(!c.aparte) totalRutina += real;
+    const pct = c.aparte ? 0 : Math.min(100, Math.round(real / c.budget * 100));
+    const over = !c.aparte && real > c.budget;
     const row = document.createElement('div');
     row.className = 'cat-row';
     const visibles = txs.slice(0, 3).map(x => txRowHtml(c.key, x.t, x.i)).join('');
@@ -973,9 +1001,9 @@ function render(){
     row.innerHTML = `
       <div class="cat-top">
         <span class="cat-name">${c.name}${over ? '<span class="tag over">sobre tope</span>' : ''}</span>
-        <span class="cat-nums"><b>${money(real)}</b> / ${money(c.budget)}</span>
+        <span class="cat-nums"><b>${money(real)}</b>${c.aparte ? ' · no suma a tu presupuesto' : ` / ${money(c.budget)}`}</span>
       </div>
-      <div class="bar-track"><div class="bar-fill ${over ? 'over' : ''}" style="width:${pct}%"></div></div>
+      ${c.aparte ? '' : `<div class="bar-track"><div class="bar-fill ${over ? 'over' : ''}" style="width:${pct}%"></div></div>`}
       ${txs.length ? `<div class="cat-tx">${visibles}${mas}</div>` : ''}
     `;
     catList.appendChild(row);
@@ -993,14 +1021,14 @@ function render(){
   `).join('');
   const totalIngresos = state.income.reduce((a,i) => a + i.amount, 0);
 
-  const totalPresupuesto = BUDGET.reduce((a, c) => a + c.budget, 0);
+  const totalPresupuesto = BUDGET_PERSONAL.reduce((a, c) => a + c.budget, 0);
   document.getElementById('kpi-ingresos').textContent = money(totalIngresos);
   document.getElementById('kpi-ingresos-nota').textContent = `esperado ${money(INGRESO_ESPERADO)}`;
   document.getElementById('kpi-rutina').textContent = money(totalRutina);
   document.getElementById('kpi-rutina-nota').textContent = `de ${money(totalPresupuesto)} presupuestado`;
   document.getElementById('kpi-especiales').textContent = money(totalEspeciales);
   document.getElementById('ingresos-nota').textContent = `tu Excel espera ${money(INGRESO_ESPERADO)} al mes`;
-  document.getElementById('chart-box').style.height = (BUDGET.length * 26 + 40) + 'px';
+  document.getElementById('chart-box').style.height = (BUDGET_PERSONAL.length * 26 + 40) + 'px';
 
   const balance = totalIngresos - totalRutina - totalEspeciales;
   const heroEl = document.getElementById('hero-balance');
@@ -1010,9 +1038,9 @@ function render(){
     ? 'Vas en positivo — esto es lo que te sobra hasta ahora.'
     : 'Vas en negativo — esto es lo que falta cubrir hasta ahora.';
 
-  const labels = BUDGET.map(c => c.name);
-  const presupuestos = BUDGET.map(c => c.budget);
-  const reales = BUDGET.map(c => catTotal(c.key));
+  const labels = BUDGET_PERSONAL.map(c => c.name);
+  const presupuestos = BUDGET_PERSONAL.map(c => c.budget);
+  const reales = BUDGET_PERSONAL.map(c => catTotal(c.key));
 
   if(chart) chart.destroy();
   chart = new Chart(document.getElementById('chart'), {

@@ -332,3 +332,21 @@ test('lector · manda cada correo al Web App y solo etiqueta lo que quedó proce
   assert.deepEqual(etiquetados, [0, 2, 4], 'los demás se reintentan en la próxima vuelta');
   assert.match(busqueda(), /-label:GastosMensuales/);
 });
+
+test('parser · transferencia recibida con el formato nuevo (llave)', () => {
+  const { ctx } = cargarScript();
+  const sms = 'Bancolombia: Anamaria, recibiste una transferencia de LUIS PEREZ por $48,500.00 en tu cuenta *3335 conectada a la llave 1234567890 el 05/11/26 a las 10:23. Con llaves es de una y gratis. Dudas al 018000912345.';
+  assert.deepEqual({ ...ctx.parsearSMS(sms) }, {
+    fecha: '05/11/2026', descripcion: 'De LUIS PEREZ', monto: 48500, fuente: 'Bancolombia', id: 'BCOLREC-202611051023-48500',
+  });
+});
+
+test('doPost · la misma compra de Banco de Bogotá con 1–2 segundos de diferencia no se duplica', () => {
+  const { ctx, hoja } = cargarScript();
+  const sms = 'Banco de Bogota: Tu compra por 51,518 fue aprobada con Tarjeta Crédito 6359 el 23/10/26 15:53:27 en DROGUERIAS FARMAHOGAR ¿Dudas? Llama a la Servilinea';
+  assert.equal(post(ctx, { texto: sms }).message, 'Movimiento registrado.');
+  assert.equal(post(ctx, { correo: CORREO.bdb('2026/10/23 15:53:22', '51,518.00', 'DROGUERIAS FARMAHOGAR') }).duplicate, true);
+  // Otra compra por el mismo valor, pero horas después, sí entra.
+  assert.equal(post(ctx, { correo: CORREO.bdb('2026/10/23 18:10:00', '51,518.00', 'DROGUERIAS FARMAHOGAR') }).message, 'Movimiento registrado.');
+  assert.equal(hoja.filas.length, 3);
+});
