@@ -40,6 +40,10 @@
   .wrap{max-width:760px; margin:0 auto; padding:32px 20px 80px;}
   h1{font-weight:700; font-size:28px; margin:0 0 2px; letter-spacing:-0.01em;}
   .sub{color:var(--ink-soft); font-size:14px; margin:0 0 28px;}
+  .mes-nav{display:flex; align-items:center; gap:10px; margin:0 0 28px;}
+  .mes-nav .sub{margin:0;}
+  .mes-btn{background:none; border:1px solid var(--line); border-radius:999px; width:30px; height:30px; padding:0; color:var(--ink); font-size:17px; line-height:1; cursor:pointer; font-family:'Inter',sans-serif;}
+  .mes-btn:disabled{opacity:.3; cursor:default;}
   .hero{
     background:var(--surface); border:1px solid var(--line); border-radius:16px;
     padding:26px 24px; margin-bottom:20px;
@@ -140,10 +144,14 @@
 <div class="wrap">
 
   <h1>Tu presupuesto</h1>
-  <p class="sub" id="month-label">Septiembre 2026</p>
+  <div class="mes-nav">
+    <button class="mes-btn" id="mes-ant" onclick="cambiarMes(-1)" aria-label="Mes anterior">‹</button>
+    <p class="sub" id="month-label"></p>
+    <button class="mes-btn" id="mes-sig" onclick="cambiarMes(1)" aria-label="Mes siguiente">›</button>
+  </div>
 
   <div class="hero">
-    <p class="hero-label">Balance del mes hasta hoy</p>
+    <p class="hero-label" id="hero-label">Balance del mes hasta hoy</p>
     <p class="hero-number" id="hero-balance">$0</p>
     <p class="hero-note" id="hero-note">Ingresos recibidos menos todo lo gastado o comprometido.</p>
   </div>
@@ -188,7 +196,7 @@
   <section>
     <div class="sec-head">
       <h2>Movimientos del Sheet</h2>
-      <span class="sec-note">los SMS que tus Atajos ya registraron</span>
+      <span class="sec-note">los avisos de correo y SMS que ya están en el Sheet</span>
     </div>
     <p class="hint">Trae los movimientos del Google Sheet que todavía no has agregado y sugiere la categoría de cada uno: por el comercio, por los pagos fijos de tu Excel (arriendo, administración…) o por cómo clasificaste antes algo igual. El ahorro y los pagos a tu tarjeta de Banco de Bogotá vienen para ignorar; lo que no reconozca queda marcado para que elijas tú.</p>
     <div class="form-card">
@@ -270,8 +278,13 @@ if(!window.storage){
   };
 }
 
-const MONTH_KEY = 'presupuesto-2026-09';
-const MONTH = MONTH_KEY.slice(-7);
+// La app lleva un mes a la vez (cada uno guardado aparte) y abre en el mes
+// actual. Septiembre de 2026 es el primero: arrancó con los datos que ya
+// estaban en la app; los meses siguientes empiezan vacíos y se llenan
+// sincronizando el Sheet.
+const PRIMER_MES = '2026-09';
+let MONTH = hoyISO().slice(0, 7);
+const claveMes = mes => `presupuesto-${mes}`;
 const SYNC_CONFIG_KEY = 'presupuesto-sync-config';
 const LEARNED_CATEGORIES_KEY = 'presupuesto-categorias-aprendidas';
 
@@ -285,6 +298,7 @@ const CAT_IGNORAR = '__ignorar';
 const METODO_POR_FUENTE = {
   'Banco de Bogotá': 'Tarjeta Banco de Bogotá',
   'Bancolombia': 'Débito Bancolombia',
+  'RappiCard': 'Tarjeta Rappi',
 };
 
 // Fecha local (Colombia), no UTC: toISOString() daba el día siguiente
@@ -301,11 +315,32 @@ function escapeHtml(s){
 function renderMonthLabel(){
   const [y, m] = MONTH.split('-').map(Number);
   const hoy = new Date();
+  const esMesActual = MONTH === hoyISO().slice(0, 7);
   let texto = `${MESES[m-1]} ${y}`;
-  if(hoy.getFullYear() === y && hoy.getMonth() + 1 === m){
+  if(esMesActual){
     texto += ` · día ${hoy.getDate()} de ${new Date(y, m, 0).getDate()}`;
   }
   document.getElementById('month-label').textContent = texto;
+  document.getElementById('hero-label').textContent = esMesActual ? 'Balance del mes hasta hoy' : 'Balance del mes';
+  document.getElementById('mes-ant').disabled = MONTH <= PRIMER_MES;
+  document.getElementById('mes-sig').disabled = esMesActual;
+}
+
+// "2026-11" + 1 → "2026-12"; "2026-01" - 1 → "2025-12".
+function sumarMes(mes, delta){
+  const [y, m] = mes.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+async function cambiarMes(delta){
+  const destino = sumarMes(MONTH, delta);
+  if(destino < PRIMER_MES || destino > hoyISO().slice(0, 7)) return;
+  cancelImport();
+  setSyncStatus('', false);
+  MONTH = destino;
+  await cargarMes();
+  render();
 }
 
 // Presupuesto oficial de $5.000.000/mes del Excel Finanzas_Anamaria: los
@@ -436,11 +471,13 @@ let syncConfig = syncDefaults();
 let learned = { byDesc: {}, byAmount: {} };
 
 function freshDefaults(){
+  if(MONTH !== PRIMER_MES) return normalize({});
   return { expenses: JSON.parse(JSON.stringify(EXPENSES_DEFAULT)), specials: [...SPECIALS_DEFAULT], income: [...INCOME_DEFAULT], importedIds: [] };
 }
 
 function normalize(s){
   if(!s || typeof s !== 'object') return freshDefaults();
+  const conDatosIniciales = MONTH === PRIMER_MES;
   if(!s.expenses || typeof s.expenses !== 'object') s.expenses = {};
   for(const [vieja, nueva] of Object.entries(CATEGORIAS_ANTERIORES)){
     if(Array.isArray(s.expenses[vieja])){
@@ -450,22 +487,26 @@ function normalize(s){
   }
   BUDGET.forEach(c => {
     if(!Array.isArray(s.expenses[c.key])){
-      s.expenses[c.key] = EXPENSES_DEFAULT[c.key] ? JSON.parse(JSON.stringify(EXPENSES_DEFAULT[c.key])) : [];
+      s.expenses[c.key] = conDatosIniciales && EXPENSES_DEFAULT[c.key] ? JSON.parse(JSON.stringify(EXPENSES_DEFAULT[c.key])) : [];
     }
   });
-  if(!Array.isArray(s.specials)) s.specials = [...SPECIALS_DEFAULT];
-  if(!Array.isArray(s.income)) s.income = [...INCOME_DEFAULT];
+  if(!Array.isArray(s.specials)) s.specials = conDatosIniciales ? [...SPECIALS_DEFAULT] : [];
+  if(!Array.isArray(s.income)) s.income = conDatosIniciales ? [...INCOME_DEFAULT] : [];
   if(!Array.isArray(s.importedIds)) s.importedIds = [];
   return s;
 }
 
-async function loadState(){
+async function cargarMes(){
   try{
-    const r = await window.storage.get(MONTH_KEY);
+    const r = await window.storage.get(claveMes(MONTH));
     state = normalize(JSON.parse(r.value));
   }catch(e){
     state = freshDefaults();
   }
+}
+
+async function loadState(){
+  await cargarMes();
   try{
     await saveState();
     await loadSyncConfig();
@@ -479,7 +520,7 @@ async function loadState(){
 }
 
 async function saveState(){
-  try{ await window.storage.set(MONTH_KEY, JSON.stringify(state)); }catch(e){ console.error('storage error', e); }
+  try{ await window.storage.set(claveMes(MONTH), JSON.stringify(state)); }catch(e){ console.error('storage error', e); }
 }
 
 // ---------- Conexión con el Apps Script ----------
@@ -613,6 +654,8 @@ async function fetchMovimientos(){
   return Array.isArray(data.movimientos) ? data.movimientos : [];
 }
 
+const RAPPICARD_POR_CORREO_DESDE = '2026-11';
+
 // El Apps Script marca el tipo de SMS en el prefijo del ID.
 function tipoMovimiento(m){
   if(m.id.startsWith('BCOLAHO-')) return 'ahorro';
@@ -620,9 +663,12 @@ function tipoMovimiento(m){
   // Las compras con la tarjeta de Banco de Bogotá ya llegan una por una;
   // sumar también el pago de la tarjeta las contaría dos veces.
   if(m.id.startsWith('BCOLPAG-') && /banco de bogot/i.test(m.descripcion)) return 'pagoTarjeta';
-  // Davivienda es la RappiCard: sus compras no llegan por SMS, así que el
-  // pago se registra como gasto especial (igual que el de agosto).
-  if(m.id.startsWith('BCOLPAG-') && /davivienda/i.test(m.descripcion)) return 'pagoRappiCard';
+  // Davivienda es la RappiCard. Hasta octubre sus compras no llegaban, así
+  // que el pago se registraba como gasto especial; desde noviembre llegan
+  // una por una por correo y el pago se ignora, como el de Banco de Bogotá.
+  if(m.id.startsWith('BCOLPAG-') && /davivienda/i.test(m.descripcion)){
+    return normalizeDate(m.fecha).slice(0, 7) >= RAPPICARD_POR_CORREO_DESDE ? 'pagoTarjeta' : 'pagoRappiCard';
+  }
   return 'gasto';
 }
 

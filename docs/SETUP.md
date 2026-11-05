@@ -36,6 +36,9 @@ que hacer tú, porque requiere tu cuenta de Google, de GitHub o tu iPhone.
     nuevos) y las transferencias recibidas como "Ingreso".
   - Guarda los datos en el navegador (localStorage), así que funciona en
     GitHub Pages sin backend propio.
+  - Abre en el mes actual; con ‹ › se ven los meses anteriores (desde
+    septiembre de 2026). Cada mes se guarda aparte y se llena con
+    **Sincronizar desde el Sheet**.
 
 ## 2. Lo que tienes que hacer tú
 
