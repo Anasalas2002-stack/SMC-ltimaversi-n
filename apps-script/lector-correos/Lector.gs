@@ -20,7 +20,7 @@ function revisarCorreos() {
   const etiqueta = GmailApp.getUserLabelByName(ETIQUETA) || GmailApp.createLabel(ETIQUETA);
   const hilos = GmailApp.search(BUSQUEDA, 0, 30);
   for (const hilo of hilos) {
-    let todoEnviado = true;
+    let todoProcesado = true;
     for (const mensaje of hilo.getMessages()) {
       const respuesta = UrlFetchApp.fetch(WEB_APP_URL, {
         method: 'post',
@@ -28,12 +28,17 @@ function revisarCorreos() {
         payload: JSON.stringify({ correo: mensaje.getPlainBody() }),
         muteHttpExceptions: true,
       });
-      // Si el Web App no contestó, el hilo queda sin etiqueta y se reintenta
-      // en la próxima vuelta. Los repetidos los descarta el Web App por ID.
-      if (respuesta.getResponseCode() !== 200) todoEnviado = false;
-      console.log(`${mensaje.getSubject()} → ${respuesta.getContentText()}`);
+      const texto = respuesta.getContentText();
+      console.log(`${mensaje.getSubject()} → ${texto}`);
+      // Solo se etiqueta lo que el Web App guardó, ya tenía o descartó por
+      // no ser un aviso. Cualquier otra respuesta (sin conexión, un error,
+      // un formato que todavía no reconoce) deja el hilo para reintentarlo
+      // en la próxima vuelta; los repetidos los descarta el Web App por ID.
+      let r = {};
+      try { r = JSON.parse(texto); } catch (e) { /* no era JSON */ }
+      if (respuesta.getResponseCode() !== 200 || !(r.ok || r.ignorado)) todoProcesado = false;
     }
-    if (todoEnviado) hilo.addLabel(etiqueta);
+    if (todoProcesado) hilo.addLabel(etiqueta);
   }
 }
 

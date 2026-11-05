@@ -282,12 +282,14 @@ test('doPost · un correo que no es aviso (extracto) se ignora sin escribir', ()
 });
 
 // ---------- Lector.gs ----------
-function cargarLector({ codigos }) {
+// Cada respuesta es [código HTTP, cuerpo] de lo que contesta el Web App.
+function cargarLector({ respuestas }) {
   const source = fs.readFileSync(path.join(__dirname, '..', 'lector-correos', 'Lector.gs'), 'utf8');
   const etiquetados = [];
   const enviados = [];
-  const hilos = codigos.map((codigo, i) => ({
+  const hilos = respuestas.map(([codigo, cuerpo], i) => ({
     codigo,
+    cuerpo,
     getMessages: () => [{ getSubject: () => `aviso ${i}`, getPlainBody: () => `cuerpo ${i}` }],
     addLabel() { etiquetados.push(i); },
   }));
@@ -303,7 +305,7 @@ function cargarLector({ codigos }) {
       fetch: (url, opciones) => {
         enviados.push(JSON.parse(opciones.payload));
         const i = enviados.length - 1;
-        return { getResponseCode: () => hilos[i].codigo, getContentText: () => '{"ok":true}' };
+        return { getResponseCode: () => hilos[i].codigo, getContentText: () => hilos[i].cuerpo };
       },
     },
   };
@@ -312,10 +314,21 @@ function cargarLector({ codigos }) {
   return { ctx: context, etiquetados, enviados, busqueda: () => busqueda };
 }
 
-test('lector · manda cada correo al Web App y solo etiqueta lo que se envió bien', () => {
-  const { ctx, etiquetados, enviados, busqueda } = cargarLector({ codigos: [200, 500, 200] });
+test('lector · manda cada correo al Web App y solo etiqueta lo que quedó procesado', () => {
+  const { ctx, etiquetados, enviados, busqueda } = cargarLector({
+    respuestas: [
+      [200, '{"ok":true,"message":"Movimiento registrado."}'],
+      [500, 'Error interno'],
+      [200, '{"ok":true,"duplicate":true}'],
+      // El Web App con el código viejo, que no entiende el campo "correo".
+      [200, '{"ok":false,"error":"Faltan datos obligatorios."}'],
+      [200, '{"ok":false,"ignorado":true,"error":"El correo no es un aviso de movimiento."}'],
+      [200, '<html>Página de inicio de sesión</html>'],
+    ],
+  });
   ctx.revisarCorreos();
-  assert.deepEqual(enviados, [{ correo: 'cuerpo 0' }, { correo: 'cuerpo 1' }, { correo: 'cuerpo 2' }]);
-  assert.deepEqual(etiquetados, [0, 2], 'el que falló se reintenta en la próxima vuelta');
+  assert.equal(enviados.length, 6);
+  assert.deepEqual(enviados[0], { correo: 'cuerpo 0' });
+  assert.deepEqual(etiquetados, [0, 2, 4], 'los demás se reintentan en la próxima vuelta');
   assert.match(busqueda(), /-label:GastosMensuales/);
 });
