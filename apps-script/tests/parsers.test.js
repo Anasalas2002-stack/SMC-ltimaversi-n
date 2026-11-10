@@ -358,3 +358,11 @@ test('parser · transferencia a otra cuenta sin centavos y con el año completo'
     fecha: '19/10/2026', descripcion: 'Bancolombia', monto: 45000, fuente: 'Bancolombia', id: 'BCOLTRF-2610191308-45000',
   });
 });
+
+test('parser · pago recibido (con la hora y la fecha invertidas, como lo manda el banco)', () => {
+  const { ctx } = cargarScript();
+  const sms = 'Bancolombia: Recibiste un pago por $2,700,000.00 de ACCION FIDUCIAR a tu cuenta AHORROS, el 13:34 a las 10/11/2026. ¿Tienes dudas? Encuentranos aqui:018000931987. Estamos cerca';
+  assert.deepEqual({ ...ctx.parsearSMS(sms) }, {
+    fecha: '10/11/2026', descripcion: 'De ACCION FIDUCIAR', monto: 2700000, fuente: 'Bancolombia', id: 'BCOLREC-202611101334-2700000',
+  });
+});

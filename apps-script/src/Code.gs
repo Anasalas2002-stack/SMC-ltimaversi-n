@@ -145,6 +145,7 @@ function parsearSMS(texto) {
     parseBancolombiaTransferenciaEnviada,
     parseBancolombiaTransferenciaRecibida,
     parseBancolombiaTransferenciaRecibidaLlave,
+    parseBancolombiaPagoRecibido,
     parseBancolombiaPagoQR,
     parseBancolombiaAhorroBolsillo,
   ];
@@ -323,6 +324,28 @@ function parseBancolombiaTransferenciaRecibidaLlave(texto) {
     descripcion: `De ${remitente.trim()}`,
     fuente: 'Bancolombia',
     id: `BCOLREC-20${yy}${mm}${dd}${hh}${mi}-${montoNumero}`,
+  };
+}
+
+// "Bancolombia: Recibiste un pago por $2,700,000.00 de ACCION FIDUCIAR a tu
+//  cuenta AHORROS, el 13:34 a las 10/11/2026..." (el banco invierte la hora y
+//  la fecha; también se acepta en el orden normal).
+function parseBancolombiaPagoRecibido(texto) {
+  const m = texto.match(/Recibiste un pago por\s*\$\s*([\d,.]*\d)\s+de\s+(.+?)\s+a tu cuenta/i);
+  if (!m) return null;
+  const invertida = texto.match(/el\s+(\d{2}):(\d{2})\s+a las\s+(\d{2})\/(\d{2})\/(\d{4})/i);
+  const normal = texto.match(/el\s+(\d{2})\/(\d{2})\/(\d{4})\s+a las\s+(\d{2}):(\d{2})/i);
+  let dd, mm, yyyy, hh, mi;
+  if (invertida) [, hh, mi, dd, mm, yyyy] = invertida;
+  else if (normal) [, dd, mm, yyyy, hh, mi] = normal;
+  else return null;
+  const montoNumero = parseMontoCOP(m[1]);
+  return {
+    monto: montoNumero,
+    fecha: `${dd}/${mm}/${yyyy}`,
+    descripcion: `De ${m[2].trim()}`,
+    fuente: 'Bancolombia',
+    id: `BCOLREC-${yyyy}${mm}${dd}${hh}${mi}-${montoNumero}`,
   };
 }
 
