@@ -271,12 +271,14 @@ function parseBancolombiaPagoProducto(texto) {
 
 // "Bancolombia: ANA, transferiste $286,433.00 a la llave @riano9246
 //  desde tu cuenta *3335 a JUAN RIANO el 18/09/26 a las 17:44..."
+// También "Transferiste $45,000 desde tu cuenta *3335 a la cuenta *123 el
+// 19/10/2026 a las 13:08" (sin centavos y con el año completo).
 function parseBancolombiaTransferenciaEnviada(texto) {
-  const monto = texto.match(/transferiste\s*\$\s*([\d,]+\.\d{2})/i);
+  const monto = texto.match(/transferiste\s*\$\s*([\d,.]*\d)/i);
   const destinatario = texto.match(/a la llave\s*@?[\w.]+\s*desde tu cuenta\s*\*?\d+\s*a\s+(.+?)\s+el\s+\d{2}\/\d{2}\/\d{2}/i);
-  const fechaHora = texto.match(/el\s+(\d{2})\/(\d{2})\/(\d{2})\s+a las\s+(\d{2}):(\d{2})/i);
+  const fechaHora = texto.match(/el\s+(\d{2})\/(\d{2})\/(?:20)?(\d{2})\s+a las\s+(\d{2}):(\d{2})/i);
   if (!monto || !fechaHora) return null;
-  const montoNumero = Number(monto[1].replace(/,/g, ''));
+  const montoNumero = parseMontoCOP(monto[1]);
   const [, dd, mm, yy, hh, mi] = fechaHora;
   const dest = destinatario ? destinatario[1].trim() : 'Bancolombia';
   return {

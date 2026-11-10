@@ -350,3 +350,11 @@ test('doPost · la misma compra de Banco de Bogotá con 1–2 segundos de difere
   assert.equal(post(ctx, { correo: CORREO.bdb('2026/10/23 18:10:00', '51,518.00', 'DROGUERIAS FARMAHOGAR') }).message, 'Movimiento registrado.');
   assert.equal(hoja.filas.length, 3);
 });
+
+test('parser · transferencia a otra cuenta sin centavos y con el año completo', () => {
+  const { ctx } = cargarScript();
+  const sms = 'Bancolombia: Transferiste $45,000 desde tu cuenta *3335 a la cuenta *0000000000 el 19/10/2026 a las 13:08. ¿Dudas? Llamanos al 018000931987. Estamos cerca.';
+  assert.deepEqual({ ...ctx.parsearSMS(sms) }, {
+    fecha: '19/10/2026', descripcion: 'Bancolombia', monto: 45000, fuente: 'Bancolombia', id: 'BCOLTRF-2610191308-45000',
+  });
+});
